@@ -32,7 +32,7 @@ export default function TasksPage() {
       week: open.filter((t) => !isOverdue(t) && dayOf(t) && dayOf(t)! > today && dayOf(t)! <= weekEnd).sort(sort),
       later: open.filter((t) => dayOf(t) && dayOf(t)! > weekEnd).sort(sort),
       undated: open.filter((t) => !dayOf(t)).sort(sort),
-      done: list.filter((t) => t.status === 'done').sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')).slice(0, 50),
+      done: list.filter((t) => t.status === 'done').sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')),
       cancelled: list.filter((t) => t.status === 'cancelled').slice(0, 30),
     };
   }, [tasks.data, q, pri, proj, today, weekEnd, nowIso]);

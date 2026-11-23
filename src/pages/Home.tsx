@@ -243,8 +243,7 @@ function TodoList() {
   const toast = useToast();
   const [t, setT] = useState('');
   const today = todayKey();
-  const list = (all.data ?? []).filter((x) => !x.due_date && !x.starts_at && !x.parent_task_id && x.status !== 'cancelled'
-    && (x.status !== 'done' || (x.completed_at && dayKeyOf(x.completed_at) === today)));
+  const list = (all.data ?? []).filter((x) => !x.due_date && !x.starts_at && !x.parent_task_id && x.status !== 'cancelled');
   const open = list.filter((x) => x.status !== 'done').sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
   const doneL = list.filter((x) => x.status === 'done');
   async function add() {
