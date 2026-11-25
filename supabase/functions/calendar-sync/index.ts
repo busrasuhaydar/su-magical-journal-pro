@@ -10,7 +10,7 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 const TZ = "Europe/Istanbul";
 
 // ── ICS üretimi ──
-const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 const fold = (l: string) => { const out: string[] = []; let s = l; while (s.length > 74) { out.push(s.slice(0, 74)); s = " " + s.slice(74); } out.push(s); return out.join("\r\n"); };
 const utc = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 const dateOnly = (d: string) => d.replace(/-/g, "");
@@ -93,6 +93,8 @@ function parseIcs(text: string) {
 async function syncCalendar(c: { id: string; owner_id: string; url: string }) {
   try {
     const url = c.url.replace(/^webcal:\/\//i, "https://");
+    const host = new URL(url).hostname;
+    if (!/^https?:$/.test(new URL(url).protocol) || /^(localhost|0\.|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1|\[?f[cd])/i.test(host) || host.endsWith(".internal") || host.endsWith(".local")) throw new Error("Address not allowed");
     const r = await fetch(url, { headers: { "User-Agent": "JournalCalendarSync/1.0" }, signal: AbortSignal.timeout(20000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const evs = parseIcs(await r.text());

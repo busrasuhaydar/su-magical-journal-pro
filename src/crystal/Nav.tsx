@@ -36,6 +36,7 @@ export const NAV: NavItem[] = [
   { to: '/social', match: '/social', label: 'Social Media', short: 'Social', Icon: Megaphone, hint: 'Posting plan' },
   { to: '/contacts', match: '/contacts', label: 'Contacts', short: 'Contacts', Icon: Users, hint: 'Galleries, curators' },
   { to: '/tags', match: '/tags', label: 'Tags', short: 'Tags', Icon: Hash, hint: 'Everything by #tag' },
+  { to: '/summary', match: '/summary', label: 'Month in Review', short: 'Review', Icon: Sparkles, hint: 'Monthly & yearly summary to share' },
   { to: '/files', match: '/files', label: 'Files', short: 'Files', Icon: Files, hint: 'Documents, images' },
   { to: '/settings', match: '/settings', label: 'Settings', short: 'Settings', Icon: Settings, hint: 'Preferences, notifications' },
 ];

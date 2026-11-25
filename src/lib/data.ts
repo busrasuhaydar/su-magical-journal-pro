@@ -1,5 +1,6 @@
 // Veri katmanı: tüm ekranlar aynı tabloları okur; değişiklikler Realtime ile her yere yansır.
 import { occurrences } from './rrule';
+import { currentCity, getPref } from './prefs';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
@@ -343,7 +344,39 @@ export function useJournal(day: DayKey) {
   });
 }
 export async function ensureJournalDay(day: DayKey): Promise<JournalDay> {
-  return run<JournalDay>(supabase.from('journal_days').upsert({ day }, { onConflict: 'owner_id,day' }).select().single());
+  const jd = await run<JournalDay>(supabase.from('journal_days').upsert({ day }, { onConflict: 'owner_id,day' }).select().single());
+  if (day === todayKey() && !jd.weather) void enrichJournalDay(jd);
+  return jd;
+}
+/** Günlük kaydı oluşunca: hava durumu (Open-Meteo) ve izin verildiyse konum (şehir adı) journal_days'e yazılır. */
+let enriching = '';
+export async function enrichJournalDay(jd: JournalDay) {
+  if (enriching === jd.id) return; enriching = jd.id;
+  try {
+    const c = currentCity();
+    type W = { city: string; temp: number; label: string; hi: number; lo: number };
+    let w = queryClient.getQueryData<W>(['weather', c.name]);
+    if (!w) {
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FIstanbul&forecast_days=1`);
+      const j = await r.json();
+      const code = j.current.weather_code as number;
+      const label = code <= 1 ? 'Clear' : code <= 3 ? 'Partly cloudy' : code <= 48 ? 'Foggy' : code <= 67 || (code >= 80 && code <= 82) ? 'Rainy' : code <= 86 ? 'Snowy' : 'Stormy';
+      w = { city: c.name, temp: Math.round(j.current.temperature_2m), label, hi: Math.round(j.daily.temperature_2m_max[0]), lo: Math.round(j.daily.temperature_2m_min[0]) };
+    }
+    let place: string | null = null;
+    if (getPref('autoPlace', '0') === '1' && 'geolocation' in navigator) place = await locateCity().catch(() => null);
+    await supabase.from('journal_days').update({ weather: { temp: w.temp, label: w.label, hi: w.hi, lo: w.lo, city: w.city }, ...(place ? { place } : {}) }).eq('id', jd.id);
+    queryClient.invalidateQueries({ queryKey: ['journal'] });
+  } catch { /* hava durumu yoksa sessizce geç */ }
+}
+export function locateCity(): Promise<string | null> {
+  return new Promise((res, rej) => navigator.geolocation.getCurrentPosition(async (p) => {
+    try {
+      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${p.coords.latitude.toFixed(3)}&longitude=${p.coords.longitude.toFixed(3)}&localityLanguage=en`);
+      const j = await r.json();
+      res(j.city || j.locality || j.principalSubdivision || null);
+    } catch (x) { rej(x); }
+  }, rej, { timeout: 9000, maximumAge: 30 * 60_000 }));
 }
 export function useJournalGoals(from: DayKey, to: DayKey) {
   return useQuery({

@@ -21,3 +21,9 @@ English-only copy of the Turkish crystal journal (`~/Desktop/Su Kristal Defter`)
 - Full-text search RPC `search_content(q)`; trash RPC `trash_list()`; `0012_history_trash_purge.sql` (30-day purge cron) must be run manually in the SQL editor.
 - Offline: `src/lib/offline.ts` (IndexedDB query cache + write queue via custom supabase fetch).
 - New tables: inbox_items, artworks, application_kit, tags, tag_links (all: owner_id, RLS sahip_erisimi, log_change, deleted_at, realtime, TABLE_KEYS). Print pages live outside the Shell under `/print/*`.
+
+## Personalization & important features (migrations 0018–0019)
+- Layout prefs live in `profiles.ui_prefs` (`layout`, `home_presets`, `dock`, `nav_pins`, `sort`, `view`, `defs`, `calendar`, `look`, `recent_blocks`). Edit mode = `src/lib/layout.tsx` (`useLayout`, `EditableItem`, `Sortable`, dnd-kit). Definitions/calendar/look applied in `src/lib/defs.ts`. List manual order = `position` + RPC `set_positions` (`src/lib/listSort.tsx`).
+- Editor: `blockParts.tsx` (toolbar, format bubble, plus menu, paste, embed), `extraBlocks.tsx` (drawing, button). Columns = `content.row/col`. Inline tokens `__u__ ~~s~~ ==h== {c:|} {h:|} {d:|}`.
+- Custom RRULE: `src/lib/rrule.ts` ↔ DB `rrule_next` / `complete_task`. `@date` parser `src/lib/dateParse.ts` (TR+EN).
+- Automations: table `automations`, triggers `run_automations`, cron `date-automations`. Edge function `calendar-sync` (deployed, verify_jwt off): ICS feed `?token=` + hourly external ICS import (cron `calendar-sync`). Cron `month-summary` → `/summary/:period`.
