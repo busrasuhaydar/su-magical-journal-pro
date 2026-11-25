@@ -15,7 +15,7 @@ import { useProjectGallery } from '../../pages/project/Gallery';
 import { HAS_MARKUP, PAGE_TOKEN, renderInline } from './inline';
 
 export type PageLite = Pick<Page, 'id' | 'title' | 'icon' | 'parent_id' | 'project_id'> & { journal_day?: string | null };
-type Op = { before: PageBlock | null; after: PageBlock | null };
+export type Op = { before: PageBlock | null; after: PageBlock | null };
 type PickType = 'image' | 'file' | 'task' | 'page';
 
 const TEXT_TYPES: BlockType[] = ['text', 'h1', 'h2', 'h3', 'bullet', 'numbered', 'todo', 'quote', 'callout'];
@@ -36,7 +36,6 @@ const PLACEHOLDER: Partial<Record<BlockType, string>> = { h1: 'Heading 1', h2: '
 
 const toRow = (b: PageBlock) => ({ id: b.id, page_id: b.page_id, type: b.type, content: b.content, file_id: b.file_id, task_id: b.task_id, ref_page_id: b.ref_page_id, position: b.position });
 
-export interface EditorApi { flush: () => void }
 
 export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onText, autoStart }: {
   /** Boş sayfada ilk bloğu hemen açıp odaklar. */ autoStart?: boolean;
@@ -112,10 +111,10 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
     qc.invalidateQueries({ queryKey: ['links'] });
   }
 
-  const flush = useCallback(() => {
+  const flush = useCallback(async () => {
     window.clearTimeout(timer.current);
     const ids = [...dirty.current];
-    if (ids.length) void persist(ids);
+    if (ids.length) await persist(ids);
   }, [persist]);
   const schedule = useCallback(() => { window.clearTimeout(timer.current); timer.current = window.setTimeout(flush, 600); }, [flush]);
 
@@ -125,17 +124,17 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
       const rows = [...dirty.current].map((id) => listRef.current.find((b) => b.id === id)).filter(Boolean) as PageBlock[];
       keepaliveUpsert('page_blocks', rows.map(toRow));
     };
-    const vis = () => { if (document.visibilityState === 'hidden') flush(); };
+    const vis = () => { if (document.visibilityState === 'hidden') void flush(); };
     window.addEventListener('pagehide', unload);
     window.addEventListener('beforeunload', unload);
     document.addEventListener('visibilitychange', vis);
-    return () => { window.removeEventListener('pagehide', unload); window.removeEventListener('beforeunload', unload); document.removeEventListener('visibilitychange', vis); flush(); };
+    return () => { window.removeEventListener('pagehide', unload); window.removeEventListener('beforeunload', unload); document.removeEventListener('visibilitychange', vis); void flush(); };
   }, [flush]);
 
   function change(id: string, patch: Partial<PageBlock>, immediate = false) {
     setList(listRef.current.map((b) => (b.id === id ? { ...b, ...patch, content: patch.content ?? b.content } : b)));
     dirty.current.add(id);
-    if (immediate) flush(); else schedule();
+    if (immediate) void flush(); else schedule();
   }
   function posBetween(i: number) { const a = listRef.current[i]?.position ?? 0, b = listRef.current[i + 1]?.position; return b == null ? a + 1 : (a + b) / 2; }
   function insertAt(i: number, partial: Partial<PageBlock>, focus: number | 'end' | null = 0) {
@@ -145,7 +144,7 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
     setList(next);
     dirty.current.add(b.id);
     if (focus !== null && isText(b.type)) focusReq.current = { id: b.id, at: focus };
-    flush();
+    void flush();
     return b;
   }
   async function remove(id: string) {
@@ -314,7 +313,7 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
                 ? <TextBlock b={b} n={num} onOpenPage={onOpenPage}
                     register={(el) => { if (el) inputs.current.set(b.id, el); else inputs.current.delete(b.id); }}
                     onChange={(t, c) => onTextChange(b, t, c)} onKeyDown={(e) => onKey(e, b, i)} titleOf={titleOf}
-                    onFocus={() => setFocused(b.id)} onBlur={() => { flush(); setTimeout(() => { setFocused((f) => (f === b.id ? null : f)); setMention((m) => (m?.id === b.id ? null : m)); }, 150); }}
+                    onFocus={() => setFocused(b.id)} onBlur={() => { void flush(); setTimeout(() => { setFocused((f) => (f === b.id ? null : f)); setMention((m) => (m?.id === b.id ? null : m)); }, 150); }}
                     onCheck={(c) => change(b.id, { content: { ...b.content, checked: c } }, true)} />
                 : <MediaBlock b={b} projectId={projectId} onChange={(patch) => change(b.id, patch, true)} onOpenPage={onOpenPage} />}
             </div>
@@ -343,7 +342,7 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
 }
 
 // Sayfa düzeyinde erişim (geri al/yinele, geçmişten geri yükleme)
-export const apiRef = new Map<string, { flush: () => void; applyVersion: (id: string, v: PageBlock | null) => Promise<void> }>();
+export const apiRef = new Map<string, { flush: () => Promise<void>; applyVersion: (id: string, v: PageBlock | null) => Promise<void> }>();
 
 function BlockMenu({ onPick, onClose }: { onPick: (t: BlockType) => void; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);

@@ -12,6 +12,7 @@ import { getPref, setPref } from '../lib/prefs';
 import { todayKey } from '../lib/dates';
 import { useEditors } from '../components/Editors';
 import { useToast } from '../components/ui';
+import { QuickLinks } from '../components/QuickLinks';
 
 export type NavItem = { to: string; match: string; label: string; short: string; Icon: LucideIcon; hint: string };
 export const NAV: NavItem[] = [
@@ -134,6 +135,7 @@ export function IndexSheet({ onClose, pins, setPins }: { onClose: () => void; pi
           <div className="cr-recent-row">{recent.map((n) => <Link key={n.match} to={n.to} onClick={onClose} className="chip"><n.Icon size={13} />{n.short}</Link>)}</div>
         </div>
       )}
+      <QuickLinks onNavigate={onClose} compact />
       <div className="cr-index">
         {NAV.map((n) => {
           const on = isActive(loc.pathname, n);

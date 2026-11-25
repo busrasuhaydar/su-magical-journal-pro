@@ -20,6 +20,8 @@ import { isCollectionProject, useNfts } from '../../lib/nft';
 import { GalleryTab, Thumb, useProjectGallery } from './Gallery';
 import { MediaSources } from '../../components/Media';
 import { PagesTab } from './Pages';
+import { FavButton } from '../../components/FavButton';
+import { useTrackRecent } from '../../lib/ui';
 import { LinkButton, LinkedIn } from './Links';
 import { HistoryTab, MemoryTab, PeopleTab, SocialTab } from './Sections';
 
@@ -40,6 +42,7 @@ export default function ProjectWorkspace() {
 
 function Workspace({ p, tab, sub }: { p: Project; tab: string; sub?: string }) {
   const nav = useNavigate();
+  useTrackRecent({ kind: 'project', id: p.id, label: p.title, icon: p.icon ?? '✦', href: `/projects/${p.slug}` });
   return (
     <>
       <ProjectHeader p={p} />
@@ -118,6 +121,7 @@ function ProjectHeader({ p }: { p: Project }) {
             {(progress?.overdue_tasks ?? 0) > 0 && <span className="chip" style={{ color: 'var(--bad)', borderColor: '#F6C1CA' }}><AlertTriangle size={12} />{progress!.overdue_tasks} overdue tasks</span>}
             {isCollectionProject(p) && <CollectionLink slug={p.slug.replace('koleksiyon-', '')} />}
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEdit(true)}><Pencil size={13} />Edit</button>
+            <FavButton item={{ kind: 'project', id: p.id, label: p.title, icon: p.icon ?? '✦', href: `/projects/${p.slug}` }} />
           </div>
         </div>
         <div style={{ textAlign: 'center' }}>
