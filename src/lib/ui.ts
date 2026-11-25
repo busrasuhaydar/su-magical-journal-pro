@@ -6,17 +6,18 @@ import type { Profile } from './types';
 
 /** Favori / son açılan öğe (sayfa, proje, eser, etiket…). */
 export interface NavRef { kind: 'page' | 'project' | 'artwork' | 'tag' | 'opportunity' | 'contact'; id: string; label: string; icon?: string | null; href: string }
-export interface UiPrefs { titles?: Record<string, string>; hide?: string[]; boston?: boolean; avatar?: string | null; bg?: string | null; favorites?: NavRef[]; recent_items?: NavRef[] }
-export const HOME_SECTIONS: [string, string][] = [
-  ['plan', 'Today’s Plan'], ['routines', 'Reminders'], ['todo', 'To-dos'], ['art', 'Artwork of the Day'], ['ideas', 'On My Mind'],
-  ['week', 'This Week'], ['upcoming', 'Upcoming'], ['social', 'Social Media'], ['projects', 'My Projects'],
-];
+export interface UiPrefs {
+  titles?: Record<string, string>; hide?: string[]; boston?: boolean; avatar?: string | null; bg?: string | null; favorites?: NavRef[]; recent_items?: NavRef[];
+  layout?: Record<string, import('./layout').ScreenLayout>; home_presets?: Record<string, import('./layout').ScreenLayout>; home_active?: string;
+  dock?: string[]; nav_pins?: NavRef[]; sort?: Record<string, string>; view?: Record<string, string>;
+  defs?: import('./defs').Defs; calendar?: import('./defs').CalPrefs; look?: import('./defs').LookPrefs; recent_blocks?: string[];
+}
 export function useHomePrefs() {
   const ui: UiPrefs = useProfile().data?.ui_prefs ?? {};
   return {
     ui,
-    title: (k: string, d: string) => ui.titles?.[k]?.trim() || d,
-    visible: (k: string) => !(ui.hide ?? []).includes(k),
+    title: (k: string, d: string) => ui.layout?.home?.names?.[k]?.trim() || ui.titles?.[k]?.trim() || d,
+    visible: (_k: string) => true, // görünürlük artık ana sayfa düzeninde (layout.home)
     boston: ui.boston !== false,
   };
 }
@@ -24,7 +25,7 @@ export const bostonTime = (d: Date) => new Intl.DateTimeFormat('en-GB', { timeZo
 export const bostonDay = (d: Date) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(d);
 
 // ── Favoriler ve son açılanlar (profiles.ui_prefs: cihazlar arasında eşitlenir) ──
-function usePrefsWriter() {
+export function usePrefsWriter() {
   const qc = useQueryClient();
   const update = useUpdateProfile();
   return (f: (ui: UiPrefs) => UiPrefs) => {

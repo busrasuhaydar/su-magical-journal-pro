@@ -1,3 +1,4 @@
+import { DragList, DragRow, SortPicker, sortList, useListPrefs, useReorder } from '../lib/listSort';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,7 +19,9 @@ export default function IdeasPage() {
   const [cat, setCat] = useState('');
   const [edit, setEdit] = useState<Partial<Idea> | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  const list = (ideas.data ?? []).filter((i) => (!cat || i.category === cat) && (showArchived || i.status !== 'archived'));
+  const lp = useListPrefs('ideas', 'date');
+  const reorder = useReorder('ideas', [['ideas']]);
+  const list = sortList((ideas.data ?? []).filter((i) => (!cat || i.category === cat) && (showArchived || i.status !== 'archived')), lp.mode, { date: (i) => i.created_at, desc: true, name: (i) => i.title });
   return (
     <>
       <PageHead title="Ideas & Notes"><button type="button" className="btn btn-primary" onClick={() => setEdit({ category: (cat || 'art') as IdeaCategory })}><Plus size={15} />New idea</button></PageHead>
@@ -27,16 +30,19 @@ export default function IdeasPage() {
           <button type="button" className={cat === '' ? 'on' : ''} onClick={() => setCat('')}>All</button>
           {(Object.keys(IDEA_CATEGORY_LABEL) as IdeaCategory[]).map((k) => <button type="button" key={k} className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{IDEA_CATEGORY_LABEL[k]}</button>)}
         </div>
+        <SortPicker id="isort" mode={lp.mode} onChange={lp.setMode} options={['manual', 'date', 'name']} />
         <label className="row small" style={{ gap: 6, cursor: 'pointer' }}><input id="i-arch" type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />Show archive</label>
       </div>
       {!ideas.isLoading && list.length === 0 && <section className="glass panel"><Empty title="The idea notebook is empty">Write everything that comes to mind here; turn it into a project when it’s ready.</Empty></section>}
+      <DragList ids={list.map((i) => i.id)} enabled={lp.mode === 'manual'} onMove={(a, b) => reorder(list.map((i) => i.id), a, b)}>
       <div className="cards">
         {list.map((i) => {
           const proj = projects.data?.find((p) => p.id === i.converted_project_id);
           const linked = projects.data?.find((p) => p.id === i.project_id);
           const work = nfts.data?.items.find((n) => i.body && (i.body.includes(n.opensea) || (n.superrare && i.body.includes(n.superrare))));
           return (
-            <div key={i.id} className="glass panel proj-card" onClick={() => setEdit(i)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setEdit(i)} style={{ opacity: i.status === 'archived' ? 0.6 : 1 }}>
+            <DragRow key={i.id} id={i.id} enabled={lp.mode === 'manual'} className="card-drag">
+            <div className="glass panel proj-card" onClick={() => setEdit(i)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setEdit(i)} style={{ opacity: i.status === 'archived' ? 0.6 : 1 }}>
               <div className="row" style={{ justifyContent: 'space-between' }}><span className="chip">{IDEA_CATEGORY_LABEL[i.category]}</span><span className="small muted">{formatShort(dayKeyOf(i.created_at))}</span></div>
               <h3>{i.title}</h3>
               <TagList type="idea" id={i.id} />
@@ -47,9 +53,11 @@ export default function IdeasPage() {
                 {work && <Link className="chip chip-on-soft" to={`/collections/${work.c}?artwork=${work.contract.slice(0, 10).toLowerCase()}-${work.tokenId}`}><Gem size={12} />{work.name}</Link>}
               </div>}
             </div>
+            </DragRow>
           );
         })}
       </div>
+      </DragList>
       {edit && <IdeaEditor draft={edit} onClose={() => setEdit(null)} />}
     </>
   );

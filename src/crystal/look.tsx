@@ -36,7 +36,7 @@ export function useLookUpload() {
 
 export function useLookUrl(kind: 'avatar' | 'bg') {
   const path = useProfile().data?.ui_prefs?.[kind] ?? null;
-  return useQuery({ queryKey: ['look', path], enabled: !!path, staleTime: 45 * 60_000, queryFn: () => signedUrl(path!) }).data ?? null;
+  return useQuery({ queryKey: ['look', path], enabled: !!path, staleTime: 45 * 60_000, queryFn: () => (/^https?:/.test(path!) ? Promise.resolve(path!) : signedUrl(path!)) }).data ?? null;
 }
 
 /** Shell'de bir kez: özel arkaplanı sahneye ve CSS yedeğine uygular. */

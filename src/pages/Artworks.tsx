@@ -1,4 +1,5 @@
 // Eserler: envanter (galeri + liste), eser kartı, orijinallik sertifikası ve sergi fiyat listesi (yazdırılabilir).
+import { DragList, DragRow, SortPicker, sortList, useListPrefs, useReorder } from '../lib/listSort';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -26,14 +27,15 @@ function ArtworkList() {
   const nav = useNavigate();
   const toast = useToast();
   const qc = useQueryClient();
-  const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('su:art-view') as 'grid' | 'list') || 'grid');
+  const lp = useListPrefs<'grid' | 'list'>('artworks', 'date', ((): 'grid' | 'list' => { try { return (localStorage.getItem('su:art-view') as 'grid' | 'list') || 'grid'; } catch { return 'grid'; } })());
+  const view = lp.view, setView = lp.setView;
+  const reorder = useReorder('artworks', [['artworks']]);
   const [q, setQ] = useState('');
   const [st, setSt] = useState('');
   const [proj, setProj] = useState('');
   const [sel, setSel] = useState<Set<string>>(new Set());
-  useEffect(() => { try { localStorage.setItem('su:art-view', view); } catch { /* yok say */ } }, [view]);
-  const list = useMemo(() => (arts.data ?? []).filter((a) => (!st || a.status === st) && (!proj || a.project_id === proj)
-    && (!q || `${a.title} ${a.technique ?? ''} ${a.year ?? ''} ${a.location ?? ''}`.toLocaleLowerCase('en').includes(q.toLocaleLowerCase('en')))), [arts.data, q, st, proj]);
+  const list = useMemo(() => sortList((arts.data ?? []).filter((a) => (!st || a.status === st) && (!proj || a.project_id === proj)
+    && (!q || `${a.title} ${a.technique ?? ''} ${a.year ?? ''} ${a.location ?? ''}`.toLocaleLowerCase('en').includes(q.toLocaleLowerCase('en')))), lp.mode, { date: (a) => a.created_at, desc: true, name: (a) => a.title }), [arts.data, q, st, proj, lp.mode]);
   const totals = useMemo(() => {
     const m = new Map<string, number>();
     for (const a of list) if (a.price != null && a.status !== 'sold') m.set(a.currency, (m.get(a.currency) ?? 0) + Number(a.price));
@@ -58,6 +60,7 @@ function ArtworkList() {
           <label className="art-search"><Search size={15} /><input id="art-q" className="input" placeholder="Search artworks…" value={q} onChange={(e) => setQ(e.target.value)} /></label>
           <select id="art-st" className="select" style={{ width: 'auto' }} value={st} onChange={(e) => setSt(e.target.value)} aria-label="Status"><option value="">All statuses</option>{Object.entries(ART_STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <select id="art-pj" className="select" style={{ width: 'auto' }} value={proj} onChange={(e) => setProj(e.target.value)} aria-label="Project"><option value="">All projects</option>{projects.data?.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select>
+          <SortPicker id="asort" mode={lp.mode} onChange={lp.setMode} options={['manual', 'date', 'name']} />
           <div className="seg" role="group" aria-label="View">
             <button type="button" className={view === 'grid' ? 'on' : ''} aria-pressed={view === 'grid'} onClick={() => setView('grid')}><Grid3x3 size={14} />Gallery</button>
             <button type="button" className={view === 'list' ? 'on' : ''} aria-pressed={view === 'list'} onClick={() => setView('list')}><List size={14} />List</button>
@@ -68,9 +71,11 @@ function ArtworkList() {
       {arts.isLoading && <p className="muted">Loading…</p>}
       {!arts.isLoading && list.length === 0 && <section className="glass panel"><Empty title="No artworks yet">Add a work from your studio, or open an NFT in My Collections and press “Inventory”.</Empty></section>}
       {view === 'grid' ? (
+        <DragList ids={list.map((a) => a.id)} enabled={lp.mode === 'manual'} onMove={(x, y) => reorder(list.map((a) => a.id), x, y)}>
         <div className="art-grid">
           {list.map((a) => (
-            <article key={a.id} className={`glass art-card${sel.has(a.id) ? ' sel' : ''}`}>
+            <DragRow key={a.id} id={a.id} enabled={lp.mode === 'manual'} className="card-drag">
+            <article className={`glass art-card${sel.has(a.id) ? ' sel' : ''}`}>
               <Link to={`/artworks/${a.id}`} className="art-img"><ArtImage a={a} /></Link>
               <div className="art-meta">
                 <Link to={`/artworks/${a.id}`} className="art-t">{a.title}</Link>
@@ -83,8 +88,10 @@ function ArtworkList() {
               </div>
               <input id={`as-${a.id}`} className="art-check" type="checkbox" checked={sel.has(a.id)} onChange={() => toggle(a.id)} aria-label={`Select ${a.title} for the price list`} />
             </article>
+            </DragRow>
           ))}
         </div>
+        </DragList>
       ) : list.length > 0 && (
         <section className="glass panel" style={{ padding: 0, overflowX: 'auto' }}>
           <table className="art-table">

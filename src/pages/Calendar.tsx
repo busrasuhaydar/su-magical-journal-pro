@@ -1,4 +1,5 @@
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { CAL, calShows } from '../lib/defs';
 import { CalendarCheck, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { PageHead } from '../components/Shell';
 import { useEditors } from '../components/Editors';
@@ -7,7 +8,7 @@ import { useToast } from '../components/ui';
 import { useCalendarRange, useHolidays, useSaveEvent, useSaveTask, useYearEntries, type CalData } from '../lib/data';
 import {
   addDays, addMonths, dayKeyOf, endOfMonth, formatLong, formatShort, hhmm, isValidKey, key, minutesOf, monthMatrix, MONTHS,
-  parseKey, startOfMonth, startOfWeek, todayKey, WEEKDAYS, WEEKDAYS_MIN, WEEKDAYS_SHORT, weekdayOf, type DayKey,
+  parseKey, startOfMonth, startOfWeek, todayKey, WEEKDAYS, WEEKDAYS_MIN, WEEKDAYS_SHORT, weekdayOf, weekHead, type DayKey,
 } from '../lib/dates';
 import { countryName, flag } from '../lib/countries';
 import { OPP_DATE_LABEL, type CalEvent, type Holiday, type SocialPost, type Task } from '../lib/types';
@@ -15,7 +16,7 @@ import { OPP_DATE_LABEL, type CalEvent, type Holiday, type SocialPost, type Task
 const VIEWS: [string, string][] = [['year', 'Year'], ['month', 'Ay'], ['week', 'Week'], ['day', 'Day'], ['agenda', 'Agenda']];
 
 export default function CalendarPage() {
-  const { view = 'year', date } = useParams();
+  const { view = CAL.view, date } = useParams();
   const d = isValidKey(date) ? date : todayKey();
   if (view === 'day') return <Navigate to={`/day/${d}`} replace />;
   if (!VIEWS.some(([v]) => v === view)) return <Navigate to="/calendar/year" replace />;
@@ -89,7 +90,7 @@ function YearView({ year }: { year: number }) {
           <div key={m} className={`mini-month${today.startsWith(`${year}-${String(m + 1).padStart(2, '0')}`) ? ' current' : ''}`}>
             <h3><Link to={`/calendar/month/${key(year, m, 1)}`}>{name}</Link></h3>
             <div className="mm-grid">
-              {WEEKDAYS_MIN.map((w, i) => <span key={i} className="wd">{w}</span>)}
+              {weekHead(WEEKDAYS_MIN).map((w, i) => <span key={i} className="wd">{w}</span>)}
               {monthMatrix(year, m).map((k, i) => {
                 if (!k) return <span key={i} />;
                 const hs = hol.byDay.get(k) ?? [];
@@ -147,7 +148,7 @@ function pillsFor(day: DayKey, data: CalData | undefined, hols: Holiday[], openT
     if (p.scheduled_at && dayKeyOf(p.scheduled_at) === day)
       out.push({ id: p.id, label: `${hhmm(minutesOf(p.scheduled_at))} ✦ ${p.title}`, cls: `post${p.status === 'published' ? ' done' : ''}`, sort: minutesOf(p.scheduled_at), onClick: openPost ? () => openPost(p) : undefined });
   }
-  return out.sort((a, b) => a.sort - b.sort);
+  return out.filter((p) => calShows(p.cls.split(' ')[0])).sort((a, b) => a.sort - b.sort);
 }
 
 // ── Ay ─────────────────────────────────────────────────
@@ -164,7 +165,7 @@ function MonthView({ d }: { d: DayKey }) {
     <section className="glass panel">
       <div className="panel-head"><Legend /></div>
       <div className="month-grid">
-        {WEEKDAYS_SHORT.map((w) => <div key={w} className="wd">{w}</div>)}
+        {weekHead(WEEKDAYS_SHORT).map((w, i) => <div key={i} className="wd">{w}</div>)}
         {cells.map((_, i) => {
           const k = addDays(first, i);
           const out = k < startOfMonth(d) || k > endOfMonth(d);
@@ -201,8 +202,8 @@ export function useGridHandlers() {
 
 export function gridItems(data?: CalData): GridItem[] {
   return [
-    ...(data?.tasks ?? []).filter((t) => t.starts_at && t.status !== 'cancelled').map((rec) => ({ kind: 'task' as const, rec })),
-    ...(data?.events ?? []).map((rec) => ({ kind: 'event' as const, rec })),
+    ...(calShows('task') ? data?.tasks ?? [] : []).filter((t) => t.starts_at && t.status !== 'cancelled').map((rec) => ({ kind: 'task' as const, rec })),
+    ...(calShows('event') ? data?.events ?? [] : []).map((rec) => ({ kind: 'event' as const, rec })),
   ];
 }
 

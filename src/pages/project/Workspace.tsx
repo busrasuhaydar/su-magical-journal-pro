@@ -2,15 +2,15 @@
 import { useMemo, useState, type DragEvent, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, Check, ChevronLeft, ChevronRight, Compass, Flag, Hourglass, Lightbulb, Pencil, Plus, Sparkles, StickyNote } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, ChevronLeft, ChevronRight, Compass, Flag, Hourglass, Lightbulb, Pencil, Plus, Sparkles, StickyNote, Layers, FolderHeart } from 'lucide-react';
 import { useEditors } from '../../components/Editors';
 import { TaskRow } from '../../components/TaskRow';
 import { ConfirmButton, Empty, Field, useToast } from '../../components/ui';
 import {
   addToGallery, uploadFile, useIdeas, useMemory, useNotes, useOppDates, useOpportunities, usePages, usePosts, useProgress, useProjectHistory,
-  useProjectOpps, useProjects, useRowMutation, useSaveProject, useSaveTask, useStages, useTasks,
+  useProfile, useProjectOpps, useProjects, useRowMutation, useSaveProject, useSaveTask, useStages, useTasks,
 } from '../../lib/data';
-import { addDays, addMonths, dayKeyOf, daysBetween, formatLong, formatRelative, formatShort, hhmm, minutesOf, monthMatrix, MONTHS, parseKey, startOfMonth, todayKey, WEEKDAYS_SHORT } from '../../lib/dates';
+import { addDays, addMonths, dayKeyOf, daysBetween, formatLong, formatRelative, formatShort, hhmm, minutesOf, monthMatrix, MONTHS, parseKey, startOfMonth, todayKey, WEEKDAYS_SHORT, weekHead } from '../../lib/dates';
 import {
   IDEA_CATEGORY_LABEL, MEMORY_KIND_LABEL, OPP_DATE_LABEL, OPP_STATUS_COLOR, OPP_STATUS_LABEL, PRIORITY_LABEL, PROJECT_ICONS, PROJECT_STATUS_LABEL,
   type FileRec, type Project, type Task, type TaskStatus,
@@ -21,7 +21,8 @@ import { GalleryTab, Thumb, useProjectGallery } from './Gallery';
 import { MediaSources } from '../../components/Media';
 import { PagesTab } from './Pages';
 import { FavButton } from '../../components/FavButton';
-import { useTrackRecent } from '../../lib/ui';
+import { usePrefsWriter, useTrackRecent } from '../../lib/ui';
+import { EditableItem, Sortable, useEditMode, useLayout } from '../../lib/layout';
 import { LinkButton, LinkedIn } from './Links';
 import { HistoryTab, MemoryTab, PeopleTab, SocialTab } from './Sections';
 
@@ -40,15 +41,43 @@ export default function ProjectWorkspace() {
   return <Workspace p={p} tab={TABS.some(([k]) => k === tab) ? tab : 'overview'} sub={sub} />;
 }
 
+/** Proje sekmeleri: düzenleme modunda sırala, gizle, yeniden adlandır; tüm projeler için ya da yalnız bu proje. */
+function ProjectTabs({ p, tab }: { p: Project; tab: string }) {
+  const ui = useProfile().data?.ui_prefs ?? {};
+  const write = usePrefsWriter();
+  const { on } = useEditMode();
+  const own = !!ui.layout?.[`ptabs:${p.id}`];
+  const lay = useLayout(own ? `ptabs:${p.id}` : 'ptabs', TABS.map(([id, label]) => ({ id, label })));
+  const setOwn = (v: boolean) => write((u) => { const l = { ...(u.layout ?? {}) }; if (v) l[`ptabs:${p.id}`] = structuredClone(l.ptabs ?? {}); else delete l[`ptabs:${p.id}`]; return { ...u, layout: l }; });
+  if (!on) {
+    return (
+      <nav className="ptabs" aria-label="Project sections">
+        {lay.visible.map((it) => <Link key={it.id} to={`/projects/${p.slug}/${it.id}`} className={it.id === tab ? 'on' : ''}>{it.name}</Link>)}
+      </nav>
+    );
+  }
+  return (
+    <div className="ptabs-edit">
+      <div className="seg" role="group" aria-label="Apply tab layout to">
+        <button type="button" className={!own ? 'on' : ''} aria-pressed={!own} onClick={() => setOwn(false)}><Layers size={13} />All projects</button>
+        <button type="button" className={own ? 'on' : ''} aria-pressed={own} onClick={() => setOwn(true)}><FolderHeart size={13} />Only this project</button>
+      </div>
+      <Sortable ids={lay.items.map((i) => i.id)} onMove={lay.move}>
+        <nav className="ptabs ed-tabs" aria-label="Project sections (editing)">
+          {lay.items.map((it) => <EditableItem key={it.id} item={it} lay={lay}><span className={`ptab-t${it.id === tab ? ' on' : ''}`}>{it.name}</span></EditableItem>)}
+        </nav>
+      </Sortable>
+    </div>
+  );
+}
+
 function Workspace({ p, tab, sub }: { p: Project; tab: string; sub?: string }) {
   const nav = useNavigate();
   useTrackRecent({ kind: 'project', id: p.id, label: p.title, icon: p.icon ?? '✦', href: `/projects/${p.slug}` });
   return (
     <>
       <ProjectHeader p={p} />
-      <nav className="ptabs" aria-label="Project sections">
-        {TABS.map(([k, l]) => <Link key={k} to={`/projects/${p.slug}/${k}`} className={k === tab ? 'on' : ''}>{l}</Link>)}
-      </nav>
+      <ProjectTabs p={p} tab={tab} />
       {tab === 'overview' && <Overview p={p} />}
       {tab === 'tasks' && <TasksTab p={p} />}
       {tab === 'gallery' && <GalleryTab p={p} />}
@@ -290,7 +319,7 @@ function TasksTab({ p }: { p: Project }) {
             <button type="button" className="btn btn-glass icon-btn" onClick={() => setMonth(addMonths(month, 1))} aria-label="Next month"><ChevronRight size={16} /></button>
           </div>
           <div className="month-grid">
-            {WEEKDAYS_SHORT.map((w) => <div key={w} className="wd">{w}</div>)}
+            {weekHead(WEEKDAYS_SHORT).map((w, i) => <div key={i} className="wd">{w}</div>)}
             {monthMatrix(y, m).map((k, i) => (
               <div key={k ?? 'x' + i} className={`mcell${!k ? ' out' : ''}${k === today ? ' today' : ''}`} onClick={() => k && openTask({ project_id: p.id, due_date: k })} style={{ minHeight: 90 }}>
                 {k && <span className="num">{parseKey(k).d}</span>}

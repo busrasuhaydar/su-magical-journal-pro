@@ -1,4 +1,5 @@
 // Exhibitions & Opportunities: başvuru hattı, duyurudan otomatik kayıt, hazırlık planı ve hatırlatıcılar.
+import { DragList, DragRow, SortPicker, sortList, useListPrefs, useReorder } from '../lib/listSort';
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -31,11 +32,20 @@ function OpportunityList() {
   const dates = useOppDates();
   const nav = useNavigate();
   const [intake, setIntake] = useState(false);
-  const [view, setView] = useState<'pipe' | 'list'>('pipe');
+  const lp = useListPrefs<'pipe' | 'list'>('opportunities', 'date', 'pipe');
+  const view = lp.view, setView = lp.setView;
+  const reorder = useReorder('opportunities', [['opportunities']]);
   const [kind, setKind] = useState('');
   const today = todayKey();
-  const list = (opps.data ?? []).filter((o) => !kind || o.kind === kind);
   const deadline = (o: Opportunity) => dates.data?.find((d) => d.opportunity_id === o.id && d.kind === 'deadline');
+  const list = sortList((opps.data ?? []).filter((o) => !kind || o.kind === kind), lp.mode, { date: (o) => deadline(o)?.day ?? o.created_at, name: (o) => o.title });
+  const cols = [...PIPE, ...(Object.keys(OPP_STATUS_LABEL) as typeof PIPE).filter((k) => !PIPE.includes(k))];
+  const manual = lp.mode === 'manual';
+  const dragCards = (l: Opportunity[]) => (
+    <DragList ids={l.map((o) => o.id)} enabled={manual} onMove={(a, b) => reorder(l.map((o) => o.id), a, b)}>
+      {l.map((o) => <DragRow key={o.id} id={o.id} enabled={manual} className="card-drag"><Card o={o} /></DragRow>)}
+    </DragList>
+  );
   const soon = (dates.data ?? []).filter((d) => d.day >= today && d.day <= addDays(today, 30) && list.some((o) => o.id === d.opportunity_id)).slice(0, 8);
 
   const Card = ({ o }: { o: Opportunity }) => {
@@ -71,21 +81,22 @@ function OpportunityList() {
         </section>
       )}
       <div className="row">
+        <SortPicker id="osort" mode={lp.mode} onChange={lp.setMode} options={['manual', 'date', 'name']} />
         <select id="ok-kind" className="select" style={{ width: 'auto' }} value={kind} onChange={(e) => setKind(e.target.value)}><option value="">All types</option>{Object.entries(OPP_KIND_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         <span className="small muted">Dashed cards are potential opportunities; solid ones are confirmed exhibitions.</span>
       </div>
       {!opps.isLoading && list.length === 0 && <section className="glass panel"><Empty title="No opportunities yet">Paste an open call text, upload a PDF or give a link; dates, requirements and preparation tasks are extracted automatically.</Empty></section>}
       {view === 'pipe' && list.length > 0 && (
         <div className="pipe">
-          {PIPE.filter((s) => list.some((o) => o.status === s) || ['to_review', 'potential', 'preparing', 'submitted', 'awaiting', 'accepted'].includes(s)).map((s) => (
+          {cols.filter((s) => list.some((o) => o.status === s) || ['to_review', 'potential', 'preparing', 'submitted', 'awaiting', 'accepted'].includes(s)).map((s) => (
             <div key={s} className="pipe-col">
               <div className="kcol-head"><i className="dot" style={{ background: OPP_STATUS_COLOR[s] }} /><b className="small">{OPP_STATUS_LABEL[s]}</b><span className="count">{list.filter((o) => o.status === s).length}</span></div>
-              {list.filter((o) => o.status === s).map((o) => <Card key={o.id} o={o} />)}
+              {dragCards(list.filter((o) => o.status === s))}
             </div>
           ))}
         </div>
       )}
-      {view === 'list' && <div className="cards">{list.map((o) => <Card key={o.id} o={o} />)}</div>}
+      {view === 'list' && <div className="cards">{dragCards(list)}</div>}
       {intake && <IntakeDialog onClose={() => setIntake(false)} onCreated={(newId) => nav(`/opportunities/${newId}`)} />}
     </>
   );

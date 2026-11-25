@@ -1,4 +1,5 @@
 // Ortak galeri: tüm projelerin, günlüğün ve paylaşımların görselleri tek yerde. File bir kez saklanır, istediğiniz projeye bağlanır.
+import { DragList, DragRow, SortPicker, sortList, useListPrefs, useReorder } from '../lib/listSort';
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CheckSquare, FolderPlus, Trash2, Upload, X } from 'lucide-react';
@@ -32,8 +33,10 @@ export default function CommonGallery() {
     const ls = (links.data ?? []).filter((l) => l.file_id === id);
     return { journal: ls.some((l) => l.entity_type === 'journal_day'), post: ls.some((l) => l.entity_type === 'social_post') };
   };
-  const list = useMemo(() => (files.data ?? []).filter((f) => visual(f) && (!kind || kind === 'nft' || f.mime.startsWith(kind)) &&
-    (!proj || (proj === 'none' ? projOf(f.id).length === 0 : projOf(f.id).includes(proj)))), [files.data, links.data, proj, kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  const lp = useListPrefs('gallery', 'date');
+  const reorder = useReorder('files', [['files']]);
+  const list = useMemo(() => sortList((files.data ?? []).filter((f) => visual(f) && (!kind || kind === 'nft' || f.mime.startsWith(kind)) &&
+    (!proj || (proj === 'none' ? projOf(f.id).length === 0 : projOf(f.id).includes(proj)))), lp.mode, { date: (f) => f.created_at, desc: true, name: (f) => f.title }), [files.data, links.data, proj, kind, lp.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (id: string) => setSel((x) => (x.includes(id) ? x.filter((i) => i !== id) : [...x, id]));
   const endSel = () => { setSel([]); setSelMode(false); };
@@ -54,6 +57,7 @@ export default function CommonGallery() {
           <option value="">All images</option><option value="none">Not linked to a project</option>
           {projects.data?.map((p) => <option key={p.id} value={p.id}>{p.icon ?? '✦'} {p.title}</option>)}
         </select>
+        <SortPicker id="gsort" mode={lp.mode} onChange={lp.setMode} options={['manual', 'date', 'name']} />
         <div className="seg">{[['', 'All'], ['image/', 'Image'], ['video/', 'Video'], ['nft', 'NFT artworks']].map(([k, l]) => <button type="button" key={k} className={kind === k ? 'on' : ''} onClick={() => setKind(k)}>{l}</button>)}</div>
         <button type="button" className={`btn ${selMode ? 'btn-primary' : 'btn-glass'}`} onClick={() => (selMode ? endSel() : setSelMode(true))}><CheckSquare size={15} />{selMode ? 'Done selecting' : 'Select'}</button>
         <button type="button" className="btn btn-primary" disabled={busy} onClick={() => input.current?.click()}><Upload size={15} />{busy ? 'Loading…' : 'Upload from device'}</button>
@@ -64,22 +68,26 @@ export default function CommonGallery() {
       <section className="glass panel" hidden={kind === 'nft'} onDragOver={(e: DragEvent) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)} onDrop={(e: DragEvent) => { e.preventDefault(); setOver(false); onFiles(e.dataTransfer.files); }}>
         {over && <div className="dropzone over" style={{ marginBottom: 12 }}>Drop to add to the gallery</div>}
         {!files.isLoading && list.length === 0 ? <Empty title="No images">Drag images here or press Upload.</Empty> : (
+          <DragList ids={list.map((f) => f.id)} enabled={lp.mode === 'manual' && !selMode} onMove={(a, b) => reorder(list.map((f) => f.id), a, b)}>
           <div className="pgal">
             {list.map((f) => {
               if (selMode) return <SelectTile key={f.id} file={f} selected={sel.includes(f.id)} onToggle={() => toggle(f.id)} caption={f.title} />;
               const ps = projOf(f.id).map((id) => projects.data?.find((p) => p.id === id)).filter(Boolean);
               const u = usedIn(f.id);
               return (
-                <figure key={f.id} className="pgal-item" onClick={() => setOpen(f)} style={{ touchAction: 'auto' }}>
+                <DragRow key={f.id} id={f.id} enabled={lp.mode === 'manual'} className="card-drag">
+                <figure className="pgal-item" onClick={() => setOpen(f)} style={{ touchAction: 'auto' }}>
                   <div className="pgal-img"><Thumb file={f} /></div>
                   <figcaption>
                     <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.title}</span>
                     <span className="small muted">{ps.length ? ps.map((p) => `${p!.icon ?? '✦'} ${p!.title}`).join(' · ') : 'No project'}{u.post ? ' · in a post' : ''}{u.journal ? ' · in journal' : ''}</span>
                   </figcaption>
                 </figure>
+                </DragRow>
               );
             })}
           </div>
+          </DragList>
         )}
       </section>
       {selMode && <BulkBar selected={sel} total={list.length} fromProject={proj && proj !== 'none' ? proj : null} linkedProjects={linkedProjects} onAll={() => setSel(list.map((f) => f.id))} onClear={endSel} />}

@@ -11,6 +11,7 @@ import { ConfirmButton, Empty, useToast } from '../components/ui';
 import { useProjects, useTasks } from '../lib/data';
 import { addDays, dayKeyOf, todayKey } from '../lib/dates';
 import { PRIORITY_LABEL, PRIORITY_ORDER, type Task } from '../lib/types';
+import { DragList, DragRow, SortPicker, sortList, useListPrefs, useReorder, type SortMode } from '../lib/listSort';
 
 export default function TasksPage() {
   const tasks = useTasks();
@@ -22,6 +23,8 @@ export default function TasksPage() {
   const [showDone, setShowDone] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const lp = useListPrefs('tasks', 'date');
+  const reorder = useReorder('tasks', [['tasks']]);
   const qc = useQueryClient();
   const toast = useToast();
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -40,7 +43,10 @@ export default function TasksPage() {
       (!q || t.title.toLocaleLowerCase('en').includes(q.toLocaleLowerCase('en'))) && (!pri || t.priority === pri) && (!proj || t.project_id === proj));
     const dayOf = (t: Task) => (t.starts_at ? dayKeyOf(t.starts_at) : t.due_date);
     const open = list.filter((t) => t.status !== 'done' && t.status !== 'cancelled');
-    const sort = (a: Task, b: Task) => (dayOf(a) ?? '9').localeCompare(dayOf(b) ?? '9') || PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    const mode: SortMode = lp.mode;
+    const ordered = sortList(open, mode, { date: (t) => (t.starts_at ? t.starts_at : t.due_date), priority: (t) => PRIORITY_ORDER[t.priority], name: (t) => t.title });
+    const rank = new Map(ordered.map((t, i) => [t.id, i]));
+    const sort = (a: Task, b: Task) => rank.get(a.id)! - rank.get(b.id)!;
     const isOverdue = (t: Task) => (t.ends_at ? t.ends_at < nowIso : !!t.due_date && t.due_date < today);
     return {
       overdue: open.filter(isOverdue).sort(sort),
@@ -51,15 +57,17 @@ export default function TasksPage() {
       done: list.filter((t) => t.status === 'done').sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '')),
       cancelled: list.filter((t) => t.status === 'cancelled').slice(0, 30),
     };
-  }, [tasks.data, q, pri, proj, today, weekEnd, nowIso]);
+  }, [tasks.data, q, pri, proj, today, weekEnd, nowIso, lp.mode]);
 
   const Section = ({ title, list, overdue, color }: { title: string; list: Task[]; overdue?: boolean; color?: string }) =>
     list.length ? (
       <section className="glass panel">
         <div className="panel-head"><h2 style={{ color }}>{title}</h2><span className="count">{list.length}</span></div>
+        <DragList ids={list.map((t) => t.id)} enabled={lp.mode === 'manual' && !selecting} onMove={(a, b) => reorder(list.map((t) => t.id), a, b)}>
         <div className="task-list">{list.map((t) => selecting
           ? <div key={t.id} className={`sel-row${sel.has(t.id) ? ' on' : ''}`}><input id={`sel-${t.id}`} type="checkbox" checked={sel.has(t.id)} onChange={() => toggle(t.id)} aria-label={`Select ${t.title}`} /><TaskRow task={t} overdue={overdue} /></div>
-          : <TaskRow key={t.id} task={t} overdue={overdue} />)}</div>
+          : <DragRow key={t.id} id={t.id} enabled={lp.mode === 'manual' && !overdue}><TaskRow task={t} overdue={overdue} /></DragRow>)}</div>
+        </DragList>
       </section>
     ) : null;
 
@@ -83,6 +91,7 @@ export default function TasksPage() {
           <input id="tq" className="input" style={{ flex: '1 1 200px', width: 'auto' }} placeholder="Search tasks…" value={q} onChange={(e) => setQ(e.target.value)} />
           <select id="tpri" className="select" style={{ width: 'auto' }} value={pri} onChange={(e) => setPri(e.target.value)}><option value="">All priorities</option>{Object.entries(PRIORITY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
           <select id="tproj" className="select" style={{ width: 'auto' }} value={proj} onChange={(e) => setProj(e.target.value)}><option value="">All projects</option>{projects.data?.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select>
+          <SortPicker id="tsort" mode={lp.mode} onChange={lp.setMode} />
           <label className="row small" style={{ gap: 6, cursor: 'pointer' }}><input id="tdone" type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} />Show completed</label>
         </div>
       </div>

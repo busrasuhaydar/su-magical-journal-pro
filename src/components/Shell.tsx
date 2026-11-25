@@ -7,7 +7,10 @@ import { useProfile } from '../lib/data';
 import { currentCity } from '../lib/prefs';
 import { supabase } from '../lib/supabase';
 import { Bow, Decor, Intro, Ring } from '../crystal/Decor';
-import { CreateSheet, Dock, NAV, isActive, useRecent } from '../crystal/Nav';
+import { CreateSheet, DesktopNav, Dock, useRecent } from '../crystal/Nav';
+import { EditBar, EditModeProvider, EditToggle } from '../lib/layout';
+import { CAL, applyCalendar, applyDefs, applyLook } from '../lib/defs';
+import { NAV } from '../crystal/Nav';
 import { playPageTurn } from '../crystal/pageTurn';
 import { PageCorners } from '../crystal/PageCorners';
 import { useApplyBackground, useLookUrl } from '../crystal/look';
@@ -116,7 +119,15 @@ function useSparkle() {
 }
 
 export function Shell() {
+  return <EditModeProvider><ShellInner /></EditModeProvider>;
+}
+function ShellInner() {
   const profile = useProfile();
+  applyDefs(profile.data?.ui_prefs?.defs);
+  applyCalendar(profile.data?.ui_prefs?.calendar);
+  const calNav = NAV.find((n) => n.match === '/calendar'); if (calNav) calNav.to = `/calendar/${CAL.view}`;
+  const look = profile.data?.ui_prefs?.look;
+  useEffect(() => { applyLook(look); }, [JSON.stringify(look ?? {})]); // eslint-disable-line react-hooks/exhaustive-deps
   const nav = useNavigate();
   const loc = useLocation();
   useSparkle();
@@ -135,13 +146,7 @@ export function Shell() {
             {medalAva ? <img className="cr-medal-ava" src={medalAva} alt="" /> : <span className="cr-medal-t">Su's<br />Magical<br />Journal</span>}
           </Link>
           <div className="cr-hello"><b>Merhaba {profile.data?.display_name ?? 'Su'} ♡</b><span>Your dreams are always with you.</span></div>
-          <nav className="cr-nav" aria-label="Main menu">
-            {NAV.filter((n) => n.match !== '/').map((n) => (
-              <Link key={n.match} to={n.to} className={isActive(loc.pathname, n) ? 'active' : ''} aria-current={isActive(loc.pathname, n) ? 'page' : undefined} title={n.label}>
-                <n.Icon size={18} strokeWidth={1.75} /><span className="lbl">{n.label}</span>
-              </Link>
-            ))}
-          </nav>
+          <DesktopNav />
           <QuickLinks />
           <div className="cr-left-foot">
             <button type="button" className="btn btn-primary" onClick={() => setDeskNew(true)}><Plus size={16} /><span className="lbl">Add to journal</span></button>
@@ -155,11 +160,13 @@ export function Shell() {
             <Link to="/" className="cb-top-brand">Su's Magical Journal</Link>
             <div className="utilbar">
               <OfflineBadge />
+              <EditToggle />
               <QuickSearch />
               <NotificationBell />
             </div>
           </header>
           <div className="cb-scroll">
+            <EditBar />
             <main className="main"><Outlet /></main>
           </div>
           <PageCorners />

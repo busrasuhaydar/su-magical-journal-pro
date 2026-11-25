@@ -13,6 +13,10 @@ import { todayKey } from '../lib/dates';
 import { useEditors } from '../components/Editors';
 import { useToast } from '../components/ui';
 import { QuickLinks } from '../components/QuickLinks';
+import { ChevronDown, ChevronRight, FolderPlus, PinOff, Trash2 } from 'lucide-react';
+import { useProfile } from '../lib/data';
+import { useFavorites, usePrefsWriter, type NavRef } from '../lib/ui';
+import { EditableItem, Sortable, useEditMode, useLayout, type LayoutItem } from '../lib/layout';
 
 export type NavItem = { to: string; match: string; label: string; short: string; Icon: LucideIcon; hint: string };
 export const NAV: NavItem[] = [
@@ -39,7 +43,95 @@ export const isActive = (pathname: string, n: NavItem) => (n.match === '/' ? pat
 export const openSearch = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
 
 const DEFAULT_PINS = ['/', '/calendar', '/tasks'];
-function readPins(): string[] { try { const v = JSON.parse(getPref('dock', '[]')); return Array.isArray(v) && v.length === 3 ? v : DEFAULT_PINS; } catch { return DEFAULT_PINS; } }
+function readLocalPins(): string[] { try { const v = JSON.parse(getPref('dock', '[]')); return Array.isArray(v) && v.length >= 2 ? v : DEFAULT_PINS; } catch { return DEFAULT_PINS; } }
+/** Mobil alt çubuk sabitlemeleri (2–4 bölüm; profiles.ui_prefs.dock, cihazlar arasında eşitlenir). */
+function useDockPins(): [string[], (p: string[]) => void] {
+  const ui = useProfile().data?.ui_prefs;
+  const write = usePrefsWriter();
+  const pins = (ui?.dock?.length ? ui.dock : readLocalPins()).filter((m) => NAV.some((n) => n.match === m)).slice(0, 4);
+  return [pins.length >= 2 ? pins : DEFAULT_PINS, (p) => { setPref('dock', JSON.stringify(p)); write((u) => ({ ...u, dock: p })); }];
+}
+
+/** Menü düzeni: NAV + menüye sabitlenen favoriler + gruplar; sıra, gizle, ad, simge. */
+export function useNavLayout() {
+  const ui = useProfile().data?.ui_prefs ?? {};
+  const write = usePrefsWriter();
+  const pins = ui.nav_pins ?? [];
+  const groups = ui.layout?.nav?.groups ?? [];
+  const lay = useLayout('nav', [
+    ...NAV.map((n) => ({ id: n.match, label: n.label, icon: n.Icon })),
+    ...pins.map((p) => ({ id: `pin:${p.id}`, label: p.label, icon: Pin })),
+    ...groups.map((g) => ({ id: g.id, label: g.label })),
+  ], { register: false });
+  const togglePin = (r: NavRef) => write((u) => { const l = u.nav_pins ?? []; return { ...u, nav_pins: l.some((x) => x.id === r.id) ? l.filter((x) => x.id !== r.id) : [...l, r] }; });
+  const addGroup = () => lay.set((l) => ({ ...l, groups: [...(l.groups ?? []), { id: `g_${Date.now().toString(36)}`, label: 'New group' }] }));
+  const delGroup = (id: string) => lay.set((l) => ({ ...l, groups: (l.groups ?? []).filter((g) => g.id !== id), order: (l.order ?? []).filter((x) => x !== id) }));
+  const collapse = (id: string) => lay.set((l) => { const c = l.collapsed ?? []; return { ...l, collapsed: c.includes(id) ? c.filter((x) => x !== id) : [...c, id] }; });
+  return { lay, pins, groups, togglePin, addGroup, delGroup, collapse };
+}
+
+/** Masaüstü sol menü (düzenleme modunda sürükle, gizle, yeniden adlandır, grup, sabitle). */
+export function DesktopNav({ hideHome = true }: { hideHome?: boolean }) {
+  const loc = useLocation();
+  const { on } = useEditMode();
+  const { lay, pins, groups, togglePin, addGroup, delGroup, collapse } = useNavLayout();
+  const fav = useFavorites();
+  const navBy = new Map(NAV.map((n) => [n.match, n]));
+  const pinBy = new Map(pins.map((p) => [`pin:${p.id}`, p]));
+  const gIds = new Set(groups.map((g) => g.id));
+  const collapsed = new Set(lay.layout.collapsed ?? []);
+  let cur: string | null = null;
+  const rows = lay.items.filter((it) => !(hideHome && it.id === '/' && !lay.layout.order?.includes('/') && !on)).map((it) => { if (gIds.has(it.id)) { cur = it.id; return { it, g: null as string | null }; } return { it, g: cur }; });
+  const body = (it: LayoutItem) => {
+    const n = navBy.get(it.id), p = pinBy.get(it.id);
+    const to = n?.to ?? p?.href ?? '/';
+    const act = n ? isActive(loc.pathname, n) : loc.pathname === p?.href;
+    return (
+      <Link key={it.id} to={to} className={act ? 'active' : ''} aria-current={act ? 'page' : undefined} title={it.name} onClick={(e) => on && e.preventDefault()}>
+        {p && !it.iconName ? <span className="nav-emoji" aria-hidden="true">{p.icon ?? '★'}</span> : it.Icon && <it.Icon size={18} strokeWidth={1.75} />}<span className="lbl">{it.name}</span>
+      </Link>
+    );
+  };
+  const head = (it: LayoutItem) => (
+    <button key={it.id} type="button" className="nav-group-h" aria-expanded={!collapsed.has(it.id)} onClick={() => !on && collapse(it.id)}>
+      {collapsed.has(it.id) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}<span className="lbl">{it.name}</span>
+    </button>
+  );
+  if (!on) {
+    return (
+      <nav className="cr-nav" aria-label="Main menu">
+        {rows.map(({ it, g }) => (it.hidden || (g && collapsed.has(g)) ? null : gIds.has(it.id) ? head(it) : body(it)))}
+      </nav>
+    );
+  }
+  const unpinned = fav.list.filter((f) => !pins.some((p) => p.id === f.id));
+  return (
+    <nav className="cr-nav ed-nav" aria-label="Main menu (editing)">
+      <Sortable ids={rows.map((r) => r.it.id)} onMove={lay.move}>
+        {rows.map(({ it }) => (
+          <EditableItem key={it.id} item={it} lay={lay} className={gIds.has(it.id) ? 'nav-g' : 'nav-r'}
+            extra={gIds.has(it.id) ? <button type="button" className="ed-btn" aria-label={`Delete group ${it.name}`} title="Delete group" onClick={() => delGroup(it.id)}><Trash2 size={14} /></button>
+              : pinBy.has(it.id) ? <button type="button" className="ed-btn" aria-label={`Unpin ${it.name}`} title="Unpin from menu" onClick={() => togglePin(pinBy.get(it.id)!)}><PinOff size={14} /></button> : undefined}>
+            {gIds.has(it.id) ? head(it) : body(it)}
+          </EditableItem>
+        ))}
+      </Sortable>
+      <button type="button" className="btn btn-glass btn-sm nav-add" onClick={addGroup}><FolderPlus size={14} /><span className="lbl">Add group</span></button>
+      {unpinned.length > 0 && (
+        <div className="nav-favs">
+          <span className="cr-cap"><Pin size={11} /> Pin favorites to menu</span>
+          {unpinned.map((f) => <button key={f.id} type="button" className="chip" onClick={() => togglePin(f)}><Pin size={12} />{f.icon ? `${f.icon} ` : ''}{f.label}</button>)}
+        </div>
+      )}
+    </nav>
+  );
+}
+/** NAV öğesinin kullanıcı adı/simgesi (dok ve içindekiler için). */
+function useNavNames() {
+  const { lay } = useNavLayout();
+  const by = new Map(lay.items.map((i) => [i.id, i]));
+  return { by, ordered: lay.items.filter((i) => !i.hidden && NAV.some((n) => n.match === i.id)).map((i) => NAV.find((n) => n.match === i.id)!) };
+}
 function readRecent(): string[] { try { const v = JSON.parse(getPref('recent', '[]')); return Array.isArray(v) ? v : []; } catch { return []; } }
 
 /** Son açılan bölümleri kaydeder (içindekiler sayfasının en üstünde görünür). */
@@ -125,9 +217,11 @@ export function IndexSheet({ onClose, pins, setPins }: { onClose: () => void; pi
   const loc = useLocation();
   const nav = useNavigate();
   const recent = readRecent().map((m) => NAV.find((n) => n.match === m)).filter(Boolean).filter((n) => !isActive(loc.pathname, n!)).slice(0, 4) as NavItem[];
+  const names = useNavNames();
+  const nm = (n: NavItem) => names.by.get(n.match);
   function togglePin(m: string) {
-    if (pins.includes(m)) { if (pins.length > 1) setPins(pins.filter((x) => x !== m)); return; }
-    setPins([...pins, m].slice(-3));
+    if (pins.includes(m)) { if (pins.length > 2) setPins(pins.filter((x) => x !== m)); return; }
+    setPins([...pins, m].slice(-4));
   }
   return (
     <Sheet title="Contents" onClose={onClose}>
@@ -140,14 +234,15 @@ export function IndexSheet({ onClose, pins, setPins }: { onClose: () => void; pi
       )}
       <QuickLinks onNavigate={onClose} compact />
       <div className="cr-index">
-        {NAV.map((n) => {
+        {names.ordered.map((n) => {
           const on = isActive(loc.pathname, n);
+          const it = nm(n); const I = it?.Icon ?? n.Icon;
           const pinned = pins.includes(n.match);
           return (
             <div key={n.match} className={`cr-ix${on ? ' on' : ''}`}>
               <Link to={n.to} onClick={onClose} className="cr-ix-main">
-                <span className="cr-gem sm"><n.Icon size={19} strokeWidth={1.7} /></span>
-                <span className="cr-ix-t"><b>{n.label}</b><small>{n.hint}</small></span>
+                <span className="cr-gem sm"><I size={19} strokeWidth={1.7} /></span>
+                <span className="cr-ix-t"><b>{it?.name ?? n.label}</b><small>{n.hint}</small></span>
               </Link>
               <button type="button" className={`cr-pin${pinned ? ' on' : ''}`} aria-pressed={pinned} aria-label={pinned ? `Unpin ${n.label} from the dock` : `Pin ${n.label} to the dock`} title={pinned ? 'Unpin from the dock' : 'Pin to bottom bar'} onClick={() => togglePin(n.match)}>
                 <Pin size={15} fill={pinned ? 'currentColor' : 'none'} />
@@ -156,7 +251,7 @@ export function IndexSheet({ onClose, pins, setPins }: { onClose: () => void; pi
           );
         })}
       </div>
-      <p className="small muted cr-tip">Use the pin to attach your three most-used sections to the bottom bar. Swipe up on the bottom bar to open this page.</p>
+      <p className="small muted cr-tip">Pin 2–4 sections to the bottom bar. Tap Edit at the top to reorder, hide or rename the menu. Swipe up on the bottom bar to open this page.</p>
       <button type="button" className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut().then(() => nav('/'))}><LogOut size={14} />Sign out</button>
     </Sheet>
   );
@@ -165,31 +260,32 @@ export function IndexSheet({ onClose, pins, setPins }: { onClose: () => void; pi
 /** Mobil kristal dok: 3 sabit bölüm + ortada "New" mücevheri + "Journal". */
 export function Dock() {
   const loc = useLocation();
-  const [pins, setPinsS] = useState(readPins);
+  const [pins, setPins] = useDockPins();
   const [sheet, setSheet] = useState<'' | 'new' | 'index'>('');
-  const setPins = (p: string[]) => { setPinsS(p); setPref('dock', JSON.stringify(p.length === 3 ? p : [...p, ...DEFAULT_PINS.filter((d) => !p.includes(d))].slice(0, 3))); };
+  const names = useNavNames();
   useEffect(() => { setSheet(''); }, [loc.pathname]);
   useEffect(() => {
     const open = (e: Event) => setSheet((e as CustomEvent<'new' | 'index'>).detail);
     document.addEventListener('cr-sheet', open);
     return () => document.removeEventListener('cr-sheet', open);
   }, []);
-  const items = (pins.length === 3 ? pins : DEFAULT_PINS).map((m) => NAV.find((n) => n.match === m)!).filter(Boolean);
+  const items = pins.map((m) => NAV.find((n) => n.match === m)!).filter(Boolean);
+  const half = Math.ceil(items.length / 2);
   const y0 = useRef<number | null>(null);
   const cell = (n: NavItem) => (
     <Link key={n.match} to={n.to} className={isActive(loc.pathname, n) ? 'active' : ''} aria-current={isActive(loc.pathname, n) ? 'page' : undefined}>
-      <span className="ic"><n.Icon size={22} strokeWidth={1.75} /></span><span className="tx">{n.short}</span>
+      {(() => { const it = names.by.get(n.match); const I = it?.Icon ?? n.Icon; return <><span className="ic"><I size={22} strokeWidth={1.75} /></span><span className="tx">{it && it.name !== n.label ? it.name : n.short}</span></>; })()}
     </Link>
   );
   const inIndex = !items.some((n) => isActive(loc.pathname, n)) && NAV.some((n) => isActive(loc.pathname, n));
   return (
     <>
-      <nav className="cr-dock" aria-label="Bottom menu"
+      <nav className="cr-dock" data-n={items.length} aria-label="Bottom menu"
         onTouchStart={(e) => { y0.current = e.touches[0].clientY; }}
         onTouchEnd={(e) => { if (y0.current != null && y0.current - e.changedTouches[0].clientY > 40) setSheet('index'); y0.current = null; }}>
-        {cell(items[0])}{cell(items[1])}
+        {items.slice(0, half).map(cell)}
         <button type="button" className="cr-new" onClick={() => setSheet('new')} aria-label="Add to journal"><span className="cr-new-gem"><Plus size={26} strokeWidth={2.2} /></span></button>
-        {cell(items[2])}
+        {items.slice(half).map(cell)}
         <button type="button" className={inIndex ? 'active' : ''} onClick={() => setSheet('index')} aria-label="Contents: all sections">
           <span className="ic"><BookOpen size={22} strokeWidth={1.75} /></span><span className="tx">Journal</span>
         </button>

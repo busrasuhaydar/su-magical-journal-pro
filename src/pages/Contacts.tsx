@@ -1,3 +1,4 @@
+import { DragList, DragRow, SortPicker, sortList, useListPrefs, useReorder } from '../lib/listSort';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Plus, Mail, Globe, Phone, CalendarClock, Pencil } from 'lucide-react';
 import { PageHead } from '../components/Shell';
@@ -14,8 +15,10 @@ export default function ContactsPage() {
   const [edit, setEdit] = useState<Partial<Contact> | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const today = todayKey();
-  const list = useMemo(() => (contacts.data ?? []).filter((c) => (!cat || c.category === cat) &&
-    (!q || `${c.name} ${c.organization ?? ''} ${c.email ?? ''}`.toLocaleLowerCase('en').includes(q.toLocaleLowerCase('en')))), [contacts.data, cat, q]);
+  const lp = useListPrefs('contacts', 'name');
+  const reorder = useReorder('contacts', [['contacts']]);
+  const list = useMemo(() => sortList((contacts.data ?? []).filter((c) => (!cat || c.category === cat) &&
+    (!q || `${c.name} ${c.organization ?? ''} ${c.email ?? ''}`.toLocaleLowerCase('en').includes(q.toLocaleLowerCase('en')))), lp.mode, { date: (c) => c.last_contact_at, desc: true, name: (c) => c.name }), [contacts.data, cat, q, lp.mode]);
   const due = (contacts.data ?? []).filter((c) => c.follow_up_date && c.follow_up_date <= addDays(today, 7)).sort((a, b) => a.follow_up_date!.localeCompare(b.follow_up_date!));
   const selected = contacts.data?.find((c) => c.id === sel);
 
@@ -31,6 +34,7 @@ export default function ContactsPage() {
       <div className="glass panel" style={{ padding: 14 }}>
         <div className="row">
           <input id="cq" className="input" style={{ flex: '1 1 200px', width: 'auto' }} placeholder="Search contact, organization or email…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <SortPicker id="csort" mode={lp.mode} onChange={lp.setMode} options={['manual', 'name', 'date']} />
           <div className="seg" style={{ flexWrap: 'wrap' }}>
             <button type="button" className={cat === '' ? 'on' : ''} onClick={() => setCat('')}>All</button>
             {(Object.keys(CONTACT_CATEGORY_LABEL) as ContactCategory[]).filter((k) => k !== 'other').map((k) => <button type="button" key={k} className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{CONTACT_CATEGORY_LABEL[k]}</button>)}
@@ -40,9 +44,11 @@ export default function ContactsPage() {
       <div className="day-grid">
         <section className="glass panel">
           {contacts.isLoading ? <p className="muted">Loading…</p> : list.length === 0 ? <Empty title="No contacts yet">Collectors, galleries, curators…</Empty> : (
+            <DragList ids={list.map((c) => c.id)} enabled={lp.mode === 'manual'} onMove={(a, b) => reorder(list.map((c) => c.id), a, b)}>
             <div className="task-list">
               {list.map((c) => (
-                <div key={c.id} className="task-row" onClick={() => setSel(c.id)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setSel(c.id)} style={sel === c.id ? { background: '#fff', boxShadow: '0 0 0 2px var(--rose-300)' } : undefined}>
+                <DragRow key={c.id} id={c.id} enabled={lp.mode === 'manual'}>
+                <div className="task-row" onClick={() => setSel(c.id)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setSel(c.id)} style={sel === c.id ? { background: '#fff', boxShadow: '0 0 0 2px var(--rose-300)' } : undefined}>
                   <div className="t">
                     <b>{c.name}</b>
                     <div className="meta">
@@ -53,8 +59,10 @@ export default function ContactsPage() {
                     </div>
                   </div>
                 </div>
+                </DragRow>
               ))}
             </div>
+            </DragList>
           )}
         </section>
         {selected ? <ContactDetail c={selected} onEdit={() => setEdit(selected)} /> : <section className="glass panel"><p className="muted small">Select a contact to see details.</p></section>}
