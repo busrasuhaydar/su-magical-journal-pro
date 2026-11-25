@@ -190,7 +190,7 @@ export function AppearanceSettings() {
 export function LayoutBackup() {
   const { ui, write } = useUi();
   const toast = useToast();
-  const KEYS: (keyof UiPrefs)[] = ['layout', 'home_presets', 'home_active', 'dock', 'nav_pins', 'sort', 'view', 'defs', 'calendar', 'look', 'titles', 'hide', 'boston'];
+  const KEYS: (keyof UiPrefs)[] = ['layout', 'home_presets', 'home_active', 'dock', 'nav_pins', 'sort', 'view', 'defs', 'calendar', 'look', 'titles', 'hide', 'boston', 'boxes', 'renames', 'hidden_ui', 'canvas'];
   function exp() {
     const out: Partial<UiPrefs> = {};
     KEYS.forEach((k) => { if (ui[k] !== undefined) (out as Record<string, unknown>)[k] = ui[k]; });

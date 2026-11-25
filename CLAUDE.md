@@ -27,3 +27,6 @@ English-only copy of the Turkish crystal journal (`~/Desktop/Su Kristal Defter`)
 - Editor: `blockParts.tsx` (toolbar, format bubble, plus menu, paste, embed), `extraBlocks.tsx` (drawing, button). Columns = `content.row/col`. Inline tokens `__u__ ~~s~~ ==h== {c:|} {h:|} {d:|}`.
 - Custom RRULE: `src/lib/rrule.ts` ↔ DB `rrule_next` / `complete_task`. `@date` parser `src/lib/dateParse.ts` (TR+EN).
 - Automations: table `automations`, triggers `run_automations`, cron `date-automations`. Edge function `calendar-sync` (deployed, verify_jwt off): ICS feed `?token=` + hourly external ICS import (cron `calendar-sync`). Cron `month-summary` → `/summary/:period`.
+
+## Free layout (src/lib/freeform.tsx, src/components/FreeCanvas.tsx)
+- DOM-level engine: every `.main .glass.panel` can be moved/resized/hidden (prefs `boxes[route][title]`), any button/heading text renamed (`renames[original]`) or hidden (`hidden_ui`), canvas items (note/link/label) per screen (`canvas[route]`). Right-click (long-press on touch) opens the context menu. Sizes/moves are ignored ≤760px.
