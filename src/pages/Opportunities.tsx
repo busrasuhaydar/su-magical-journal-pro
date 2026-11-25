@@ -34,7 +34,7 @@ function OpportunityList() {
   const [intake, setIntake] = useState(false);
   const lp = useListPrefs<'pipe' | 'list'>('opportunities', 'date', 'pipe');
   const view = lp.view, setView = lp.setView;
-  const reorder = useReorder('opportunities', [['opportunities']]);
+  const reorder = useReorder('opportunities', [['opps']]);
   const [kind, setKind] = useState('');
   const today = todayKey();
   const deadline = (o: Opportunity) => dates.data?.find((d) => d.opportunity_id === o.id && d.kind === 'deadline');

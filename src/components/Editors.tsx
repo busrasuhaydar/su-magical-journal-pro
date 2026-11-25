@@ -1,4 +1,5 @@
 // Task ve etkinlik düzenleyicileri. Her sayfa aynı formu kullanır, aynı kaydı düzenler.
+import { RuleBuilder } from './RuleBuilder';
 import { createContext, useContext, useState, type FormEvent, type ReactNode } from 'react';
 import { useProjects, useSaveEvent, useSaveTask, useSoftDelete, useCompleteTask, useTasks } from '../lib/data';
 import { dayKeyOf, hhmm, minutesOf, parseHHMM, toInstant, todayKey, type DayKey } from '../lib/dates';
@@ -88,10 +89,11 @@ function TaskEditor({ draft, onClose }: { draft: TaskDraft; onClose: () => void 
           <Field label="Project"><select id="t-proj" className="select" value={f.project_id} onChange={set('project_id')}><option value="">No project</option>{projects.data?.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
         </div>
         <div className="grid-3">
-          <Field label="Repeat"><select id="t-rr" className="select" value={f.rrule} onChange={set('rrule')}>{Object.entries(RRULE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+          <Field label="Repeat"><select id="t-rr" className="select" value={f.rrule in RRULE_LABEL ? f.rrule : 'custom'} onChange={(e) => setF((s) => ({ ...s, rrule: e.target.value === 'custom' ? 'FREQ=WEEKLY;BYDAY=MO' : e.target.value }))}>{Object.entries(RRULE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}<option value="custom">Custom…</option></select></Field>
           <Field label="Reminder"><select id="t-rem" className="select" value={f.reminder} onChange={set('reminder')}>{REMINDERS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
           <Field label="Status"><select id="t-st" className="select" value={f.status} onChange={set('status')}>{Object.entries(STATUS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
         </div>
+        {f.rrule && !(f.rrule in RRULE_LABEL) && <RuleBuilder value={f.rrule} start={f.day} onChange={(rrule) => setF((s) => ({ ...s, rrule }))} />}
         {f.project_id && <Field label="Parent task (if this is a subtask)"><select id="t-parent" className="select" value={f.parent_task_id} onChange={set('parent_task_id')}><option value="">No parent task</option>{(allTasks.data ?? []).filter((t) => t.project_id === f.project_id && t.id !== draft.id && !t.parent_task_id && t.status !== 'cancelled').map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}</select></Field>}
         {draft.id && !f.parent_task_id && (
           <div className="card" style={{ display: 'grid', gap: 6 }}>

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent as RCE, type KeyboardEvent as RKE, type ReactNode, type TouchEvent as RTE } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from '@dnd-kit/core';
-import { CheckSquare, Code2, FileText, GripVertical, Heading1, Heading2, Heading3, ImagePlus, Link2, List, ListChecks, ListOrdered, ListTodo, Minus, Paperclip, Plus, Quote, Sparkle, Trash2, Type, X, Copy, Palette, Repeat2 } from 'lucide-react';
+import { CheckSquare, Code2, FileText, GripVertical, Heading1, Heading2, Heading3, ImagePlus, Link2, List, ListChecks, ListOrdered, ListTodo, Minus, Paperclip, Plus, Quote, Sparkle, Trash2, Type, X, Copy, Palette, Repeat2, CalendarClock } from 'lucide-react';
 import { addToGallery, uploadFile, useFiles, usePageBlocks, useProfile, useSignedUrl, useTasks } from '../../lib/data';
 import { keepaliveUpsert, supabase } from '../../lib/supabase';
 import type { BlockType, FileRec, Page, PageBlock } from '../../lib/types';
@@ -17,7 +17,9 @@ import { MediaSources, Thumb } from '../Media';
 import { useProjectGallery } from '../../pages/project/Gallery';
 import { HAS_MARKUP, PAGE_TOKEN, renderInline } from './inline';
 import { BG_COLORS, BlockTools, EmbedBlock, FormatBubble, PasteChoice, PlusMenu, TEXT_COLORS, splitLines, type Fmt, type Preset } from './blockParts';
-import { EXTRA_BLOCKS, ExtraBlock, extraSlash } from './extraBlocks';
+import { parseDateText, type ParsedDate } from '../../lib/dateParse';
+import { toInstant } from '../../lib/dates';
+import { EXTRA_BLOCKS, ExtraBlock, extraSlash, type ExtraProps } from './extraBlocks';
 
 export type PageLite = Pick<Page, 'id' | 'title' | 'icon' | 'parent_id' | 'project_id'> & { journal_day?: string | null };
 export type Op = { before: PageBlock | null; after: PageBlock | null };
@@ -77,6 +79,28 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
   const [drag, setDrag] = useState<string | null>(null);
   const [drop, setDrop] = useState<{ id: string; pos: DropPos } | null>(null);
   const mentionIds = useRef<Set<string> | null>(null);
+  const [dateSug, setDateSug] = useState<{ id: string; start: number; end: number; p: ParsedDate } | null>(null);
+  /** "@yarın 10:00" → tarih çipi + hatırlatmalı görev (reminders). */
+  async function acceptDate() {
+    const d = dateSug; setDateSug(null); if (!d) return;
+    const b = listRef.current.find((x) => x.id === d.id); if (!b) return;
+    const v = b.content.text ?? '';
+    const iso = d.p.time ? `${d.p.day} ${d.p.time}` : d.p.day;
+    const token = `{d:${iso}|${d.p.label}} `;
+    const text = v.slice(0, d.start) + token + v.slice(d.end);
+    change(b.id, { content: { ...b.content, text } }, true);
+    focusReq.current = { id: b.id, at: d.start + token.length };
+    const title = text.replace(/\{d:[^}]*\}/g, '').replace(/\[\[page:[^|\]]+\|([^\]]*)\]\]/g, '$1').replace(/[*_~=`]/g, '').trim().slice(0, 200) || 'Reminder';
+    try {
+      const at = toInstant(d.p.day, d.p.time ? Number(d.p.time.slice(0, 2)) * 60 + Number(d.p.time.slice(3)) : 9 * 60);
+      const ins = await supabase.from('tasks').insert({ title, due_date: d.p.day, project_id: projectId, ...(d.p.time ? { starts_at: at, ends_at: new Date(new Date(at).getTime() + 30 * 60000).toISOString() } : {}) }).select('id').single();
+      if (ins.error) throw ins.error;
+      const r = await supabase.from('reminders').insert({ task_id: ins.data.id, remind_at: at, label: 'From a page' });
+      if (r.error) throw r.error;
+      ['tasks', 'cal', 'reminders'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      toast.ok(`Reminder set · ${d.p.label}`);
+    } catch (x) { toast.fail(x); }
+  }
 
   const setList = useCallback((next: PageBlock[]) => { listRef.current = next; setListS(next); onText?.(next); }, [onText]);
 
@@ -273,7 +297,9 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
         if (re.test(text) && !re.test(b.content.text ?? '')) { change(b.id, { type, content: { ...b.content, ...extra, text: text.replace(re, '') } }); focusReq.current = { id: b.id, at: 0 }; return; }
       }
     }
-    onDateText?.(b, text, caret, (t) => change(b.id, { content: { ...b.content, text: t } }));
+    const dm = /(^|\s)@([^@\n]{2,32})$/.exec(text.slice(0, caret));
+    const pd = dm ? parseDateText(dm[2]) : null;
+    setDateSug(pd && dm ? { id: b.id, start: caret - dm[2].length - 1, end: caret, p: pd } : null);
     change(b.id, { content: { ...b.content, text } });
   }
 
@@ -338,6 +364,10 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
       if (e.key === 'ArrowUp') { e.preventDefault(); setMentionSel((x) => Math.max(x - 1, 0)); return; }
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); void pickMention(mentionItems[mentionSel] ?? 'new'); return; }
       if (e.key === 'Escape') { e.preventDefault(); setMention(null); return; }
+    }
+    if (dateSug && dateSug.id === b.id) {
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); void acceptDate(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setDateSug(null); return; }
     }
     if (slashItems.length && b.id === focused) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSel((x) => Math.min(x + 1, slashItems.length - 1)); return; }
@@ -474,7 +504,7 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
 
   // Mobil: sağa kaydır = girinti, sola kaydır = girintiyi geri al
   const sw = useRef<{ x: number; y: number; id: string } | null>(null);
-  const touchStart = (e: RTE, id: string) => { sw.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id }; };
+  const touchStart = (e: RTE, id: string) => { if ((e.target as HTMLElement).closest('canvas, .draw-box')) return; sw.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id }; };
   const touchEnd = (e: RTE) => {
     const s = sw.current; sw.current = null; if (!s || drag) return;
     const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
@@ -509,7 +539,8 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
                 onSelect={(s, e) => setSelRange(s !== e ? { id: b.id, s, e } : null)}
                 onFocus={() => { setFocused(b.id); setActive(null); }} onBlur={() => { void flush(); setTimeout(() => { setFocused((f) => (f === b.id ? null : f)); setMention((m) => (m?.id === b.id ? null : m)); setSelRange((r) => (r?.id === b.id && document.activeElement !== inputs.current.get(b.id) ? null : r)); }, 180); }}
                 onCheck={(c) => change(b.id, { content: { ...b.content, checked: c } }, true)} />
-            : <MediaBlock b={b} projectId={projectId} onChange={(patch) => change(b.id, patch, true)} onOpenPage={onOpenPage} onPick={() => setPicker({ type: b.type === 'file' ? 'file' : 'image', id: b.id })} pageId={pageId} />}
+            : <MediaBlock b={b} projectId={projectId} onChange={(patch) => change(b.id, patch, true)} onOpenPage={onOpenPage} onPick={() => setPicker({ type: b.type === 'file' ? 'file' : 'image', id: b.id })} pageId={pageId}
+                insertBlocks={(bs) => { let at = i; bs.forEach((x) => { insertAt(at, { type: x.type, content: { text: x.text, ...(x.type === 'todo' ? { checked: !!x.checked } : {}), row: b.content.row, col: b.content.col } }, null); at++; }); }} />}
         </div>
         {selRange?.id === b.id && focused === b.id && !mention && <FormatBubble onFmt={format} />}
         {paste?.id === b.id && <PasteChoice url={paste.url} onPick={pasteAs} />}
@@ -523,6 +554,12 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
             <span className="bm-cap">Link to page</span>
             {mentionItems.map((p, k) => <button type="button" key={p.id} role="option" aria-selected={k === mentionSel} className={k === mentionSel ? 'on' : ''} onMouseDown={(e) => { e.preventDefault(); void pickMention(p); }}><FileText size={15} />{p.icon} {p.title}</button>)}
             <button type="button" role="option" aria-selected={mentionSel === mentionItems.length} className={mentionSel === mentionItems.length ? 'on' : ''} onMouseDown={(e) => { e.preventDefault(); void pickMention('new'); }}><Plus size={15} />New page{mention.q.trim() ? ` “${mention.q.trim()}”` : ''}</button>
+          </div>
+        )}
+        {dateSug?.id === b.id && (
+          <div className="block-menu" role="listbox" aria-label="Date">
+            <span className="bm-cap">Date & reminder</span>
+            <button type="button" role="option" aria-selected className="on" onMouseDown={(e) => { e.preventDefault(); void acceptDate(); }}><CalendarClock size={15} />{dateSug.p.label} · Enter</button>
           </div>
         )}
         {menu?.at === i && <PlusMenu menu={BLOCK_MENU} recent={recent} onPick={(t) => chooseInsert(t, i)} onPreset={(p) => preset(p, i)} onClose={() => setMenu(null)} />}
@@ -576,9 +613,6 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
   );
 }
 
-/** @tarih gibi metin içi tetikleyiciler için kanca (extraBlocks belirler). */
-let onDateText: ((b: PageBlock, text: string, caret: number, set: (t: string) => void) => void) | undefined;
-export function setDateTextHook(f: typeof onDateText) { onDateText = f; }
 
 function BlockRow({ b, dragging, drop, selecting, picked, onPick, gutter, del, children, onTouchStart, onTouchEnd }: {
   b: PageBlock; dragging: boolean; drop: DropPos | null; selecting: boolean; picked: boolean; onPick: () => void; gutter: ReactNode; del: ReactNode; children: ReactNode;
@@ -590,7 +624,7 @@ function BlockRow({ b, dragging, drop, selecting, picked, onPick, gutter, del, c
   return (
     <div ref={dp.setNodeRef} id={`blk-${b.id}`} className={`block-row${dragging ? ' dragging' : ''}${drop ? ` drop-${drop}` : ''}${picked ? ' picked' : ''}`}
       onClickCapture={(e) => { if (selecting) { e.preventDefault(); e.stopPropagation(); onPick(); } }}
-      onTouchStart={(e) => { onTouchStart(e); if (!selecting && !(e.target as HTMLElement).closest('.grip, .bt-bar, button, input, a')) ls.onTouchStart?.(e); }} onTouchEnd={onTouchEnd}>
+      onTouchStart={(e) => { onTouchStart(e); if (!selecting && !(e.target as HTMLElement).closest('.grip, .bt-bar, button, input, a, canvas, iframe, .draw-box')) ls.onTouchStart?.(e); }} onTouchEnd={onTouchEnd}>
       <div className="block-gutter">
         {selecting ? <input type="checkbox" className="blk-check" checked={picked} readOnly aria-label="Select block" /> : <>
           {gutter}
@@ -641,7 +675,7 @@ function TextBlock({ b, n, register, onChange, onKeyDown, onFocus, onBlur, onChe
   }
 }
 
-function MediaBlock({ b, projectId, onChange, onOpenPage, onPick, pageId }: { b: PageBlock; projectId: string | null; onChange: (patch: Partial<PageBlock>) => void; onOpenPage: (id: string) => void; onPick: () => void; pageId: string }) {
+function MediaBlock({ b, projectId, onChange, onOpenPage, onPick, pageId, insertBlocks }: { b: PageBlock; projectId: string | null; onChange: (patch: Partial<PageBlock>) => void; onOpenPage: (id: string) => void; onPick: () => void; pageId: string; insertBlocks: ExtraProps['insertBlocks'] }) {
   const tasks = useTasks();
   const files = useFiles();
   void projectId;
@@ -660,7 +694,7 @@ function MediaBlock({ b, projectId, onChange, onOpenPage, onPick, pageId }: { b:
       return t ? <TaskRow task={t} /> : <p className="small muted">The task was deleted.</p>;
     }
     case 'page': return b.ref_page_id ? <button type="button" className="page-link" onClick={() => onOpenPage(b.ref_page_id!)}><FileText size={14} />{b.content.title ?? 'Page'}</button> : null;
-    default: return <ExtraBlock b={b} onChange={onChange} pageId={pageId} projectId={projectId} />;
+    default: return <ExtraBlock b={b} onChange={onChange} pageId={pageId} projectId={projectId} insertBlocks={insertBlocks} />;
   }
 }
 

@@ -12,6 +12,9 @@ import { useProfile, useSocialAccounts, useUpdateProfile } from '../lib/data';
 import { callDispatcher, disablePush, enablePush, pushActive } from '../lib/notify';
 import { CITIES, applySimple, getPref, setPref } from '../lib/prefs';
 import { useHomePrefs, type UiPrefs } from '../lib/ui';
+import { AutomationSettings } from './settings/Automations';
+import { ImportSettings } from './settings/Import';
+import { CalendarSyncSettings } from './settings/CalendarSync';
 import { AppearanceSettings, CalendarSettings, DefinitionSettings, LayoutBackup } from './settings/Personalize';
 import { supabase } from '../lib/supabase';
 import { todayKey } from '../lib/dates';
@@ -72,6 +75,9 @@ export default function SettingsPage() {
       <CalendarSettings />
       <PrefSettings />
 
+      <AutomationSettings />
+      <ImportSettings />
+      <CalendarSyncSettings />
       <NotificationSettings />
       <AccountSettings />
       <ReminderSettings />

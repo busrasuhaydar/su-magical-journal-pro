@@ -1,9 +1,11 @@
 // Veri katmanı: tüm ekranlar aynı tabloları okur; değişiklikler Realtime ile her yere yansır.
+import { occurrences } from './rrule';
+import { currentCity, getPref } from './prefs';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, sha256, slugify } from './supabase';
-import { addDays, addMonths, toInstant, todayKey, type DayKey } from './dates';
+import { addDays, dayKeyOf, hhmm, minutesOf, toInstant, todayKey, type DayKey } from './dates';
 import type { CalEvent, CalendarEntry, FileRec, Holiday, JournalBlock, JournalDay, Profile, Project, ProjectProgress, Task } from './types';
 
 export const queryClient = new QueryClient({ defaultOptions: {
@@ -58,6 +60,9 @@ const TABLE_KEYS: Record<string, string[][]> = {
   opportunity_dates: [['opps'], ['year'], ['cal']],
   project_opportunities: [['opps']],
   backups: [['backups']],
+  automations: [['automations']],
+  external_calendars: [['extcal']],
+  external_events: [['extcal'], ['cal']],
   inbox_items: [['inbox']],
   artworks: [['artworks']],
   application_kit: [['kit']],
@@ -102,27 +107,19 @@ export function useUpdateProfile() {
 
 // ── Calendar aralığı ─────────────────────────────────────
 export type CalOppDate = import('./types').OppDate & { opportunities: { title: string; status: import('./types').OppStatus } | null };
-export interface CalExtra { id: string; day: DayKey; label: string; kind: 'followup' | 'milestone' | 'project' | 'repeat'; href?: string }
+export interface CalExtra { id: string; day: DayKey; label: string; kind: 'followup' | 'milestone' | 'project' | 'repeat' | 'ext'; href?: string; color?: string }
 export interface CalData { tasks: Task[]; events: CalEvent[]; posts: import('./types').SocialPost[]; oppDates: CalOppDate[]; extras: CalExtra[] }
 /** Recurring görevin (ör. 15 günde bir) aralıktaki gelecek örnekleri. */
 function projectRepeats(t: Task, from: DayKey, to: DayKey): CalExtra[] {
   if (!t.rrule || !t.due_date) return [];
-  const freq = /FREQ=([A-Z]+)/.exec(t.rrule)?.[1], n = Number(/INTERVAL=(\d+)/.exec(t.rrule)?.[1] ?? 1);
-  const out: CalExtra[] = [];
-  let k = t.due_date;
-  for (let i = 0; i < 400; i++) {
-    k = freq === 'DAILY' ? addDays(k, n) : freq === 'WEEKLY' ? addDays(k, 7 * n) : freq === 'MONTHLY' ? addMonths(k, n) : addMonths(k, 12 * n);
-    if (k > to) break;
-    if (k >= from) out.push({ id: `rep-${t.id}-${k}`, day: k, label: `↻ ${t.title}`, kind: 'repeat' });
-  }
-  return out;
+  return occurrences(t.rrule, t.due_date, from, to).map((k) => ({ id: `rep-${t.id}-${k}`, day: k, label: `↻ ${t.title}`, kind: 'repeat' as const }));
 }
 export function useCalendarRange(from: DayKey, to: DayKey) {
   return useQuery({
     queryKey: ['cal', from, to],
     queryFn: async (): Promise<CalData> => {
       const start = toInstant(from, 0), end = toInstant(addDays(to, 1), 0);
-      const [timed, dated, events, posts, oppDates, contacts, stages, projs, repeating] = await Promise.all([
+      const [timed, dated, events, posts, oppDates, contacts, stages, projs, repeating, ext] = await Promise.all([
         run<Task[]>(supabase.from('tasks').select('*').is('deleted_at', null).lt('starts_at', end).gte('ends_at', start)),
         run<Task[]>(supabase.from('tasks').select('*').is('deleted_at', null).is('starts_at', null).gte('due_date', from).lte('due_date', to)),
         run<CalEvent[]>(supabase.from('events').select('*').is('deleted_at', null).lt('starts_at', end).gte('ends_at', start)),
@@ -132,12 +129,19 @@ export function useCalendarRange(from: DayKey, to: DayKey) {
         run<{ id: string; title: string; due_date: string; project_id: string; projects: { slug: string; title: string }[] | { slug: string; title: string } | null }[]>(supabase.from('project_stages').select('id,title,due_date,project_id,projects(slug,title)').is('deleted_at', null).gte('due_date', from).lte('due_date', to)),
         run<{ id: string; title: string; slug: string; target_date: string }[]>(supabase.from('projects').select('id,title,slug,target_date').is('deleted_at', null).neq('status', 'completed').gte('target_date', from).lte('target_date', to)),
         run<Task[]>(supabase.from('tasks').select('*').is('deleted_at', null).not('rrule', 'is', null).in('status', ['todo', 'doing']).not('due_date', 'is', null)),
+        supabase.from('external_events').select('id,title,starts_at,ends_at,all_day,external_calendars!inner(name,color,deleted_at)').is('external_calendars.deleted_at', null).lt('starts_at', end).gte('ends_at', start).limit(1000)
+          .then((r) => (r.error ? [] : (r.data ?? []) as unknown as { id: string; title: string; starts_at: string; ends_at: string; all_day: boolean; external_calendars: { name: string; color: string } | null }[])),
       ]);
       const extras: CalExtra[] = [
         ...contacts.map((c) => ({ id: `fu-${c.id}`, day: c.follow_up_date, label: `☺ Follow-up: ${c.name}`, kind: 'followup' as const, href: 'contacts' })),
         ...stages.map((x) => { const pr = Array.isArray(x.projects) ? x.projects[0] : x.projects; return { id: `st-${x.id}`, day: x.due_date, label: `◆ ${x.title}${pr ? ` · ${pr.title}` : ''}`, kind: 'milestone' as const, href: pr ? `projects/${pr.slug}` : undefined }; }),
         ...projs.map((x) => ({ id: `pj-${x.id}`, day: x.target_date, label: `⚑ Goal: ${x.title}`, kind: 'project' as const, href: `projects/${x.slug}` })),
         ...repeating.flatMap((t) => projectRepeats(t, from, to)),
+        ...ext.flatMap((x) => {
+          const out: CalExtra[] = []; let k = dayKeyOf(x.starts_at); const z = x.all_day ? addDays(dayKeyOf(x.ends_at), -1) : dayKeyOf(x.ends_at);
+          for (let i = 0; i < 31 && k <= (z < k ? k : z); i++) { if (k >= from && k <= to) out.push({ id: `ex-${x.id}-${k}`, day: k, label: `${x.all_day ? '' : hhmm(minutesOf(x.starts_at)) + ' '}${x.title}`, kind: 'ext', color: x.external_calendars?.color }); k = addDays(k, 1); }
+          return out;
+        }),
       ];
       return { tasks: [...timed, ...dated], events, posts, oppDates, extras };
     },
@@ -340,7 +344,39 @@ export function useJournal(day: DayKey) {
   });
 }
 export async function ensureJournalDay(day: DayKey): Promise<JournalDay> {
-  return run<JournalDay>(supabase.from('journal_days').upsert({ day }, { onConflict: 'owner_id,day' }).select().single());
+  const jd = await run<JournalDay>(supabase.from('journal_days').upsert({ day }, { onConflict: 'owner_id,day' }).select().single());
+  if (day === todayKey() && !jd.weather) void enrichJournalDay(jd);
+  return jd;
+}
+/** Günlük kaydı oluşunca: hava durumu (Open-Meteo) ve izin verildiyse konum (şehir adı) journal_days'e yazılır. */
+let enriching = '';
+export async function enrichJournalDay(jd: JournalDay) {
+  if (enriching === jd.id) return; enriching = jd.id;
+  try {
+    const c = currentCity();
+    type W = { city: string; temp: number; label: string; hi: number; lo: number };
+    let w = queryClient.getQueryData<W>(['weather', c.name]);
+    if (!w) {
+      const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FIstanbul&forecast_days=1`);
+      const j = await r.json();
+      const code = j.current.weather_code as number;
+      const label = code <= 1 ? 'Clear' : code <= 3 ? 'Partly cloudy' : code <= 48 ? 'Foggy' : code <= 67 || (code >= 80 && code <= 82) ? 'Rainy' : code <= 86 ? 'Snowy' : 'Stormy';
+      w = { city: c.name, temp: Math.round(j.current.temperature_2m), label, hi: Math.round(j.daily.temperature_2m_max[0]), lo: Math.round(j.daily.temperature_2m_min[0]) };
+    }
+    let place: string | null = null;
+    if (getPref('autoPlace', '0') === '1' && 'geolocation' in navigator) place = await locateCity().catch(() => null);
+    await supabase.from('journal_days').update({ weather: { temp: w.temp, label: w.label, hi: w.hi, lo: w.lo, city: w.city }, ...(place ? { place } : {}) }).eq('id', jd.id);
+    queryClient.invalidateQueries({ queryKey: ['journal'] });
+  } catch { /* hava durumu yoksa sessizce geç */ }
+}
+export function locateCity(): Promise<string | null> {
+  return new Promise((res, rej) => navigator.geolocation.getCurrentPosition(async (p) => {
+    try {
+      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${p.coords.latitude.toFixed(3)}&longitude=${p.coords.longitude.toFixed(3)}&localityLanguage=en`);
+      const j = await r.json();
+      res(j.city || j.locality || j.principalSubdivision || null);
+    } catch (x) { rej(x); }
+  }, rej, { timeout: 9000, maximumAge: 30 * 60_000 }));
 }
 export function useJournalGoals(from: DayKey, to: DayKey) {
   return useQuery({

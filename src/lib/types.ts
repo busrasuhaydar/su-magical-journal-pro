@@ -29,7 +29,7 @@ export interface Holiday {
   kind: 'public' | 'half_day' | 'observance'; certainty: 'confirmed' | 'uncertain' | 'conflicting'; note: string | null; source: string;
 }
 export interface FileRec { id: string; storage_path: string; title: string; mime: string; size: number; sha256: string; created_at: string; position?: number | null }
-export interface JournalDay { id: string; day: string; goal: string | null; mood: string | null }
+export interface JournalDay { id: string; day: string; goal: string | null; mood: string | null; weather?: { temp: number; label: string; hi?: number; lo?: number; city?: string } | null; place?: string | null }
 export interface JournalBlock {
   id: string; day_id: string; kind: BlockKind; title: string | null; body: string | null; url: string | null;
   file_id: string | null; position: number; size: 's' | 'm' | 'l'; created_at: string;

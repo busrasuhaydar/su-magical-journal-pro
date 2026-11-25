@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, type DragEvent, type PointerEvent as RPE } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Plus, Link2, FileText, Music, Film, StickyNote, Trash2, Maximize2, Upload, ExternalLink, CalendarCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Link2, FileText, Music, Film, StickyNote, Trash2, Maximize2, Upload, ExternalLink, CalendarCheck, MapPin } from 'lucide-react';
 import { PageHead } from '../components/Shell';
 import { useEditors } from '../components/Editors';
 import { TimeGrid, movedTimes } from '../components/TimeGrid';
@@ -9,6 +9,8 @@ import { TaskRow } from '../components/TaskRow';
 import { ConfirmButton, Field, formatBytes, useToast } from '../components/ui';
 import { MediaSources } from '../components/Media';
 import { gridItems, useGridHandlers } from './Calendar';
+import { enrichJournalDay, locateCity } from '../lib/data';
+import { getPref, setPref } from '../lib/prefs';
 import { ensureJournalDay, ensureJournalPage, linkFile, pageHref, uploadFile, useAllPages, useCalendarRange, useFiles, useHolidays, useJournal, useJournalPage, useOverdue, usePostsRange, useProjects, useSignedUrl, useSoftDelete } from '../lib/data';
 import { EditableItem, Sortable, useEditMode, useLayout } from '../lib/layout';
 import { BlockEditor } from '../components/editor/BlockEditor';
@@ -34,12 +36,27 @@ function MoodPanel({ day, title }: { day: DayKey; title: string }) {
   const qc = useQueryClient();
   const toast = useToast();
   const cur = j.data?.day?.mood ?? null;
+  const jd = j.data?.day;
+  const [auto, setAuto] = useState(() => getPref('autoPlace', '0') === '1');
+  useEffect(() => { if (jd && !jd.weather && day === todayKey()) void enrichJournalDay(jd); }, [jd?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function addPlace() {
+    setPref('autoPlace', '1'); setAuto(true);
+    try { const city = await locateCity(); if (!city) return; const d = await ensureJournalDay(day); await supabase.from('journal_days').update({ place: city }).eq('id', d.id); qc.invalidateQueries({ queryKey: ['journal'] }); toast.ok(`📍 ${city}`); }
+    catch { toast.fail(new Error('Location permission was not given')); }
+  }
   async function set(m: string) {
     try { const jd = await ensureJournalDay(day); const { error } = await supabase.from('journal_days').update({ mood: cur === m ? null : m }).eq('id', jd.id); if (error) throw error; qc.invalidateQueries({ queryKey: ['journal'] }); } catch (x) { toast.fail(x); }
   }
   return (
     <section className="glass panel">
       <div className="panel-head"><h2>{title}</h2>{cur && <span className="small muted">{MOOD_LABEL[cur] ?? cur}</span>}</div>
+      {(jd?.weather || jd?.place || (!auto && day === todayKey())) && (
+        <div className="row small muted day-meta">
+          {jd?.weather && <span className="chip">{jd.weather.label === 'Clear' ? '☀' : jd.weather.label === 'Rainy' ? '🌧' : jd.weather.label === 'Snowy' ? '❄' : '☁'} {jd.weather.temp}° {jd.weather.label}{jd.weather.city ? ` · ${jd.weather.city}` : ''}</span>}
+          {jd?.place && <span className="chip"><MapPin size={12} />{jd.place}</span>}
+          {!auto && day === todayKey() && !jd?.place && <button type="button" className="btn btn-ghost btn-sm" onClick={addPlace}><MapPin size={13} />Add my location</button>}
+        </div>
+      )}
       <div className="moods" role="radiogroup" aria-label={title}>
         {MOODS.map(([k, e]) => <button key={k} type="button" role="radio" aria-checked={cur === k} className={`mood${cur === k ? ' on' : ''}`} title={MOOD_LABEL[k]} aria-label={MOOD_LABEL[k]} onClick={() => set(k)}>{e}</button>)}
       </div>
