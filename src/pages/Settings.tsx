@@ -3,7 +3,7 @@ import { BackupSettings } from './settings/Backups';
 import { TrashSettings } from './settings/Trash';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarHeart, FolderHeart, Files, CalendarDays, Download, RotateCcw, ImagePlus, Trash2, UserRound } from 'lucide-react';
+import { CalendarHeart, FolderHeart, Files, CalendarDays, Download, RotateCcw, ImagePlus, Trash2, UserRound, Pencil } from 'lucide-react';
 import { useLookUpload, useLookUrl } from '../crystal/look';
 import { glassTap } from '../crystal/sound';
 import { PageHead } from '../components/Shell';
@@ -11,7 +11,8 @@ import { Field, useToast } from '../components/ui';
 import { useProfile, useSocialAccounts, useUpdateProfile } from '../lib/data';
 import { callDispatcher, disablePush, enablePush, pushActive } from '../lib/notify';
 import { CITIES, applySimple, getPref, setPref } from '../lib/prefs';
-import { HOME_SECTIONS, useHomePrefs, type UiPrefs } from '../lib/ui';
+import { useHomePrefs, type UiPrefs } from '../lib/ui';
+import { AppearanceSettings, CalendarSettings, DefinitionSettings, LayoutBackup } from './settings/Personalize';
 import { supabase } from '../lib/supabase';
 import { todayKey } from '../lib/dates';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -63,8 +64,12 @@ export default function SettingsPage() {
         <p className="small muted" style={{ marginBottom: 0 }}>Time zone: Europe/Istanbul · Date format: English</p>
       </section>
 
+      <LayoutBackup />
       <LookSettings />
+      <AppearanceSettings />
       <HomeSettings />
+      <DefinitionSettings />
+      <CalendarSettings />
       <PrefSettings />
 
       <NotificationSettings />
@@ -259,32 +264,20 @@ function PrefSettings() {
   );
 }
 
-/** Home: kart başlıklarını yeniden adlandır, kartları göster/gizle, Boston saati. Hesapla eşitlenir. */
+/** Home: düzen artık ana sayfada "Edit" ile; burada yalnız ABD saati. */
 function HomeSettings() {
   const hp = useHomePrefs();
   const update = useUpdateProfile();
   const toast = useToast();
-  const [titles, setTitles] = useState<Record<string, string>>({});
-  useEffect(() => { setTitles(hp.ui.titles ?? {}); }, [hp.ui.titles]);
   const save = (patch: Partial<UiPrefs>) => update.mutate({ ui_prefs: { ...hp.ui, ...patch } }, { onError: (e) => toast.fail(e) });
-  const toggle = (k: string) => { const hide = new Set(hp.ui.hide ?? []); hide.has(k) ? hide.delete(k) : hide.add(k); save({ hide: [...hide] }); };
   return (
     <section className="glass panel">
-      <div className="panel-head"><h2>Home</h2><button type="button" className="btn btn-glass btn-sm" onClick={() => { setTitles({}); save({ titles: {}, hide: [] }); }}><RotateCcw size={13} />Reset to default</button></div>
-      <p className="small muted" style={{ marginTop: 0 }}>Rename the card titles however you like and hide the cards you don’t want. Changes are the same on phone and computer.</p>
-      <div style={{ display: 'grid', gap: 8 }}>
-        {HOME_SECTIONS.map(([k, def]) => (
-          <div key={k} className="row" style={{ flexWrap: 'nowrap', gap: 10 }}>
-            <input type="checkbox" aria-label={`Show ${def}`} checked={!(hp.ui.hide ?? []).includes(k)} onChange={() => toggle(k)} />
-            <input className="input" value={titles[k] ?? ''} placeholder={def} onChange={(e) => setTitles((t) => ({ ...t, [k]: e.target.value }))}
-              onBlur={() => { if ((hp.ui.titles?.[k] ?? '') !== (titles[k] ?? '')) save({ titles: { ...(hp.ui.titles ?? {}), [k]: (titles[k] ?? '').trim() } }); }} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-          </div>
-        ))}
-        <label className="row small" style={{ cursor: 'pointer' }}>
-          <input type="checkbox" checked={hp.boston} onChange={(e) => save({ boston: e.target.checked })} />
-          🇺🇸 Show a small US clock on the Home page
-        </label>
-      </div>
+      <div className="panel-head"><h2>Home</h2><Link className="btn btn-glass btn-sm" to="/"><Pencil size={13} />Edit home layout</Link></div>
+      <p className="small muted" style={{ marginTop: 0 }}>On the Home page tap <b>Edit</b>: drag cards, pick small / medium / wide, hide, rename, add cards and save layouts like “Morning” or “Studio”.</p>
+      <label className="row small" style={{ cursor: 'pointer' }}>
+        <input type="checkbox" checked={hp.boston} onChange={(e) => save({ boston: e.target.checked })} />
+        🇺🇸 Show a small US clock on the Home page
+      </label>
     </section>
   );
 }

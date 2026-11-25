@@ -8,7 +8,7 @@ export interface Artwork {
   id: string; title: string; year: number | null; technique: string | null; dimensions: string | null; edition: string | null;
   price: number | null; currency: string; price_history: PricePoint[]; status: ArtStatus; location: string | null;
   buyer_contact_id: string | null; project_id: string | null; file_id: string | null; nft_key: string | null; nft_image: string | null;
-  description: string | null; notes: string | null; sold_at: string | null; created_at: string; updated_at: string;
+  description: string | null; notes: string | null; sold_at: string | null; created_at: string; updated_at: string; position?: number | null;
 }
 export const ART_STATUS_LABEL: Record<ArtStatus, string> = { studio: 'In the studio', consignment: 'On consignment at a gallery', exhibition: 'In an exhibition', sold: 'Sold' };
 export const ART_STATUS_SHORT: Record<ArtStatus, string> = { studio: 'Studio', consignment: 'Consignment', exhibition: 'Exhibition', sold: 'Sold' };

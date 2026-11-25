@@ -11,14 +11,14 @@ export interface Profile {
 export interface Project {
   id: string; title: string; slug: string; status: ProjectStatus; priority: Priority;
   start_date: string | null; target_date: string | null; color: string; description: string | null;
-  progress_override: number | null; updated_at: string; created_at: string; cover_file_id: string | null; icon: string | null;
+  progress_override: number | null; updated_at: string; created_at: string; cover_file_id: string | null; icon: string | null; position?: number | null;
 }
 export interface ProjectProgress { project_id: string; total_tasks: number; done_tasks: number; progress: number; is_manual: boolean; overdue_tasks: number }
 export interface Task {
   id: string; project_id: string | null; contact_id: string | null; title: string; description: string | null;
   due_date: string | null; starts_at: string | null; ends_at: string | null; priority: Priority;
   category: string | null; status: TaskStatus; rrule: string | null; postpone_count: number;
-  completed_at: string | null; created_at: string; updated_at: string; parent_task_id: string | null; opportunity_id: string | null; recurrence_parent?: string | null;
+  completed_at: string | null; created_at: string; updated_at: string; parent_task_id: string | null; opportunity_id: string | null; recurrence_parent?: string | null; position?: number | null;
 }
 export interface CalEvent {
   id: string; project_id: string | null; kind: EventKind; title: string; description: string | null;
@@ -28,7 +28,7 @@ export interface Holiday {
   id: string; country: string; day: string; name: string; local_name: string;
   kind: 'public' | 'half_day' | 'observance'; certainty: 'confirmed' | 'uncertain' | 'conflicting'; note: string | null; source: string;
 }
-export interface FileRec { id: string; storage_path: string; title: string; mime: string; size: number; sha256: string; created_at: string }
+export interface FileRec { id: string; storage_path: string; title: string; mime: string; size: number; sha256: string; created_at: string; position?: number | null }
 export interface JournalDay { id: string; day: string; goal: string | null; mood: string | null }
 export interface JournalBlock {
   id: string; day_id: string; kind: BlockKind; title: string | null; body: string | null; url: string | null;
@@ -57,7 +57,7 @@ export type MemoryKind = 'idea' | 'goal' | 'decision' | 'feature_added' | 'featu
 export interface Contact {
   id: string; name: string; organization: string | null; email: string | null; category: ContactCategory; phone: string | null;
   website: string | null; socials: Record<string, string>; notes: string | null; last_contact_at: string | null;
-  follow_up_date: string | null; expected_response: string | null; created_at: string;
+  follow_up_date: string | null; expected_response: string | null; created_at: string; position?: number | null;
 }
 export interface Interaction { id: string; contact_id: string; project_id: string | null; event_id: string | null; kind: InteractionKind; occurred_at: string; summary: string; notes: string | null }
 export interface ProjectContact { id: string; project_id: string; contact_id: string; role: string | null }
@@ -68,7 +68,7 @@ export interface SocialPost {
   hashtags: string[]; links: string[]; status: PostStatus; scheduled_at: string | null; published_at: string | null; notes: string | null;
   created_at: string; updated_at: string; post_targets?: PostTarget[];
 }
-export interface Idea { id: string; title: string; body: string | null; category: IdeaCategory; status: 'new' | 'developing' | 'converted' | 'archived'; converted_project_id: string | null; project_id: string | null; created_at: string }
+export interface Idea { id: string; title: string; body: string | null; category: IdeaCategory; status: 'new' | 'developing' | 'converted' | 'archived'; converted_project_id: string | null; project_id: string | null; created_at: string; position?: number | null }
 export interface Note { id: string; project_id: string | null; task_id: string | null; kind: 'note' | 'reference'; title: string; body: string | null; url: string | null; created_at: string; updated_at: string }
 export interface MemoryEntry { id: string; project_id: string; kind: MemoryKind; body: string; decided_on: string; supersedes: string | null; source: string; created_at: string }
 export interface ChangeLogRow { id: number; table_name: string; row_id: string; op: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null; at: string }
@@ -85,8 +85,12 @@ export const POST_STATUS_COLOR: Record<PostStatus, string> = { idea: '#CDB9F3', 
 // ── Gelişmiş projeler + Faz 3 ──────────────────────────
 export interface FileLink { id: string; file_id: string; entity_type: string; entity_id: string; caption: string | null; note: string | null; position: number; created_at: string }
 export interface Page { id: string; project_id: string | null; parent_id: string | null; title: string; icon: string | null; position: number; updated_at: string; artwork_key?: string | null; journal_day?: string | null; cover_file_id?: string | null }
-export type BlockType = 'text' | 'h1' | 'h2' | 'h3' | 'bullet' | 'numbered' | 'todo' | 'quote' | 'callout' | 'divider' | 'image' | 'file' | 'link' | 'task' | 'page';
-export interface PageBlock { id: string; page_id: string; type: BlockType; content: { text?: string; checked?: boolean; url?: string; title?: string; caption?: string }; file_id: string | null; task_id: string | null; ref_page_id: string | null; position: number }
+export type BlockType = 'text' | 'h1' | 'h2' | 'h3' | 'bullet' | 'numbered' | 'todo' | 'quote' | 'callout' | 'divider' | 'image' | 'file' | 'link' | 'task' | 'page' | 'embed' | 'drawing' | 'button';
+export interface PageBlock { id: string; page_id: string; type: BlockType; content: {
+    text?: string; checked?: boolean; url?: string; title?: string; caption?: string;
+    color?: string; bg?: string; indent?: number; row?: string; col?: number;
+    strokes?: unknown[]; w?: number; h?: number; label?: string; action?: Record<string, unknown>;
+  }; file_id: string | null; task_id: string | null; ref_page_id: string | null; position: number }
 export interface EntityLink { id: string; from_type: string; from_id: string; to_type: string; to_id: string; created_at: string }
 export type OppStatus = 'to_review' | 'potential' | 'preparing' | 'submitted' | 'awaiting' | 'accepted' | 'rejected' | 'exhibiting' | 'completed' | 'withdrawn';
 export type OppKind = 'exhibition' | 'fair' | 'open_call' | 'competition' | 'residency' | 'gallery' | 'program' | 'event' | 'grant';
@@ -96,7 +100,7 @@ export interface Opportunity {
   id: string; title: string; kind: OppKind; organization: string | null; gallery: string | null; city: string | null; country: string | null;
   fee_amount: number | null; fee_currency: string | null; fee_note: string | null; requirements: string | null; artwork_requirements: string | null;
   required_docs: RequiredDoc[]; application_url: string | null; contact: { name?: string; email?: string; phone?: string }; notes: string | null;
-  status: OppStatus; source_text: string | null; source_url: string | null; source_file_id: string | null; extraction: Record<string, unknown> | null; created_at: string; updated_at: string;
+  status: OppStatus; source_text: string | null; source_url: string | null; source_file_id: string | null; extraction: Record<string, unknown> | null; created_at: string; updated_at: string; position?: number | null;
 }
 export interface OppDate { id: string; opportunity_id: string; kind: OppDateKind; day: string; time_text: string | null; certainty: 'confirmed' | 'uncertain' | 'conflicting'; evidence: string | null }
 

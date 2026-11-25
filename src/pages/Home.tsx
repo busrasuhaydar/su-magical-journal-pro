@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Check, CalendarPlus, ChevronLeft, ChevronRight, Lightbulb, ListPlus, Plus, Search } from 'lucide-react';
+import { ArrowRight, Check, CalendarPlus, ChevronLeft, ChevronRight, Lightbulb, ListPlus, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { useWeather } from '../components/Shell';
 import { useEditors } from '../components/Editors';
 import { TaskRow } from '../components/TaskRow';
 import { Empty, useToast } from '../components/ui';
 import { ensureJournalDay, useCalendarRange, useCompleteTask, useHolidays, useIdeas, useJournal, useOverdue, useProfile, useProgress, useProjects, useSaveTask, useTasks, usePostsRange } from '../lib/data';
-import { addDays, addMonths, toInstant, dayKeyOf, formatLong, formatRelative, hhmm, minutesOf, startOfWeek, startOfMonth, todayKey, formatShort, MONTHS, parseKey } from '../lib/dates';
+import { addDays, addMonths, toInstant, dayKeyOf, formatLong, formatRelative, hhmm, minutesOf, startOfWeek, startOfMonth, todayKey, formatShort, MONTHS, parseKey, weekHead } from '../lib/dates';
 import { supabase } from '../lib/supabase';
 import { flag } from '../lib/countries';
 import { REMINDER_OPTIONS, RRULE_LABEL } from '../lib/types';
@@ -17,7 +17,6 @@ import { bostonTime, useHomePrefs } from '../lib/ui';
 import { IDEA_CATEGORY_LABEL, OPP_DATE_LABEL, PLATFORM_LABEL, POST_STATUS_LABEL, type Platform, type Task } from '../lib/types';
 import { EVENT_KIND_LABEL, PRIORITY_ORDER, PROJECT_STATUS_LABEL } from '../lib/types';
 
-const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function useMinute() {
   const [n, setN] = useState(() => new Date());
@@ -34,14 +33,19 @@ function greeting(min: number) {
 interface Item { id: string; at: number; end: number; title: string; sub: string; task?: Task; event?: import('../lib/types').CalEvent; done: boolean }
 
 import { QuickNote } from './Inbox';
+import { EditableItem, Sortable, useEditMode, useLayout, type Size } from '../lib/layout';
+import { AddCardDialog, CustomCardView, PresetBar, cardIcon, cardLabel } from './HomeCards';
+
+const HOME_CARDS: [string, string, Size][] = [
+  ['note', 'Quick Note', 'l'], ['plan', 'Today’s Plan', 'm'], ['todo', 'To-dos', 'm'], ['routines', 'Reminders', 's'], ['art', 'Artwork of the Day', 's'],
+  ['ideas', 'On My Mind', 's'], ['week', 'This Week', 'l'], ['upcoming', 'Upcoming', 'm'], ['projects', 'My Projects', 'm'], ['social', 'Social Media', 's'], ['month', 'Month', 's'],
+];
 
 export default function Home() {
   const today = todayKey();
   const now = useMinute();
   const nowMin = minutesOf(now);
   const { openTask, openEvent } = useEditors();
-  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 760px)').matches);
-  useEffect(() => { const m = window.matchMedia('(max-width: 760px)'); const f = () => setNarrow(m.matches); m.addEventListener('change', f); return () => m.removeEventListener('change', f); }, []);
   const complete = useCompleteTask();
   const toast = useToast();
   const profile = useProfile();
@@ -93,43 +97,17 @@ export default function Home() {
   }
   const openSearch = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }));
 
-  return (
-    <>
-      <section className="glass hero cr-hero" data-glass="window">
-        <div className="hero-main">
-          <div className="hero-top"><h1 className="cr-date">{formatLong(today)}</h1>
-          <div className="hero-chips">
-            {w ? (
-              <div className="wchip" title={w.tip}>
-                <w.Icon size={30} color="var(--orange-500)" strokeWidth={1.6} />
-                <span className="wtemp">{w.temp}°</span>
-                <span className="wtxt">{w.label}<small>{w.lo}° / {w.hi}° · rain {w.rain}%</small></span>
-              </div>
-            ) : <div className="wchip small muted">Loading weather…</div>}
-            {hp.boston && <div className="wchip boston" title="US Eastern time" aria-label={`US time ${bostonTime(now)}`}><b className="mono">{bostonTime(now)}</b></div>}
-          </div>
-          </div>
-          <p className="cr-greet"><span className="script">{greeting(nowMin)} {profile.data?.display_name ?? 'Su'}</span> <span className="cr-heart" aria-hidden="true">♡</span></p>
-          <p className="hero-sum">{bits.join(' · ')}.</p>
-          {tasks.length > 0 && <div className="prog" style={{ maxWidth: 420 }} title={`${done}/${tasks.length} tasks completed`}><b style={{ width: `${Math.round((done / tasks.length) * 100)}%` }} /></div>}
-          <div className="qa">
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => openTask({ due_date: today })}><Plus size={14} />Task</button>
-            <button type="button" className="btn btn-glass btn-sm" onClick={() => openEvent({})}><CalendarPlus size={14} />Event</button>
-            <button type="button" className="btn btn-glass btn-sm" onClick={() => { const el = document.getElementById('qi') as HTMLTextAreaElement | null; el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); el?.focus(); }}><Lightbulb size={14} />Idea</button>
-            <button type="button" className="btn btn-glass btn-sm" onClick={() => document.getElementById('todo-add')?.focus()}><ListPlus size={14} />To do</button>
-            <button type="button" className="btn btn-glass btn-sm" onClick={openSearch}><Search size={14} />Search <kbd className="kbd">⌘K</kbd></button>
-            <Link className="btn btn-glass btn-sm" to={`/day/${today}`}>Daily plan <ArrowRight size={14} /></Link>
-          </div>
-        </div>
-        <HeroArt />
-      </section>
-
-      <QuickNote />
-      {narrow && <IdeasCard />}
-
-      <div className="home-grid">
-        <div className="col">
-        <section className="glass panel" hidden={!hp.visible('plan')}>
+  const edit = useEditMode();
+  const [adding, setAdding] = useState(false);
+  const custom = hp.ui.layout?.home?.custom ?? [];
+  const lay = useLayout('home', [
+    ...HOME_CARDS.map(([id, label, size]) => ({ id, label: hp.ui.titles?.[id]?.trim() || label, size, icon: Sparkles })),
+    ...custom.map((c) => ({ id: c.id, label: cardLabel(c), size: 'm' as const, icon: cardIcon(c) })),
+  ], { fallbackHidden: hp.ui.hide });
+  const cards: Record<string, React.ReactNode> = {
+    note: <QuickNote />,
+    plan: (
+        <section className="glass panel">
           <div className="panel-head"><h2>{hp.title('plan', 'Today’s Plan')}</h2><span className="count">{timed.length + untimed.length + allDay.length}</span></div>
           {focus && (
             <div className="now-card">
@@ -174,22 +152,20 @@ export default function Home() {
           )}
           <DailyGoal />
         </section>
-        <MiniMonth />
-        </div>
-
-        <div className="col">
-          <Routines />
-          <TodoList />
-        </div>
-
-        <div className="col"><ArtOfTheDay />{!narrow && <IdeasCard />}</div>
-
-        <section className="glass panel span-all" hidden={!hp.visible('week')}>
+    ),
+    month: <MiniMonth />,
+    routines: <Routines />,
+    todo: <TodoList />,
+    art: <ArtOfTheDay />,
+    ideas: <IdeasCard />,
+    week: (
+        <section className="glass panel">
           <div className="panel-head"><h2>{hp.title('week', 'This Week')}</h2><Link className="small" to="/calendar/week">Calendar →</Link></div>
           <WeekStrip wk={wk} today={today} data={week.data} hol={hol.byDay} />
         </section>
-
-        <section className="glass panel" hidden={!hp.visible('upcoming')}>
+    ),
+    upcoming: (
+        <section className="glass panel">
           <div className="panel-head"><h2>{hp.title('upcoming', 'Upcoming')}</h2><Link className="small" to="/calendar/agenda">Agenda</Link></div>
           <div className="agenda-mini">
             {upcomingEvents.map((e) => (
@@ -207,10 +183,10 @@ export default function Home() {
             {!upcomingEvents.length && !deadlines.length && !upcomingHol.length && <p className="small muted">Nothing in the next 30 days.</p>}
           </div>
         </section>
-
-        <section className="glass panel" hidden={!hp.visible('social')}><SocialSummary /></section>
-
-        <section className="glass panel" hidden={!hp.visible('projects')}>
+    ),
+    social: <section className="glass panel"><SocialSummary /></section>,
+    projects: (
+        <section className="glass panel">
           <div className="panel-head"><h2>{hp.title('projects', 'My Projects')}</h2><Link className="small" to="/projects">All →</Link></div>
           {active.length === 0 ? <Empty title="No projects yet"><Link to="/projects">Add your first project</Link>; progress is calculated automatically.</Empty> : (
             <div className="cr-projs">
@@ -232,7 +208,60 @@ export default function Home() {
             </div>
           )}
         </section>
-      </div>
+    ),
+  };
+  return (
+    <>
+      <section className="glass hero cr-hero" data-glass="window">
+        <div className="hero-main">
+          <div className="hero-top"><h1 className="cr-date">{formatLong(today)}</h1>
+          <div className="hero-chips">
+            {w ? (
+              <div className="wchip" title={w.tip}>
+                <w.Icon size={30} color="var(--orange-500)" strokeWidth={1.6} />
+                <span className="wtemp">{w.temp}°</span>
+                <span className="wtxt">{w.label}<small>{w.lo}° / {w.hi}° · rain {w.rain}%</small></span>
+              </div>
+            ) : <div className="wchip small muted">Loading weather…</div>}
+            {hp.boston && <div className="wchip boston" title="US Eastern time" aria-label={`US time ${bostonTime(now)}`}><b className="mono">{bostonTime(now)}</b></div>}
+          </div>
+          </div>
+          <p className="cr-greet"><span className="script">{greeting(nowMin)} {profile.data?.display_name ?? 'Su'}</span> <span className="cr-heart" aria-hidden="true">♡</span></p>
+          <p className="hero-sum">{bits.join(' · ')}.</p>
+          {tasks.length > 0 && <div className="prog" style={{ maxWidth: 420 }} title={`${done}/${tasks.length} tasks completed`}><b style={{ width: `${Math.round((done / tasks.length) * 100)}%` }} /></div>}
+          <div className="qa">
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => openTask({ due_date: today })}><Plus size={14} />Task</button>
+            <button type="button" className="btn btn-glass btn-sm" onClick={() => openEvent({})}><CalendarPlus size={14} />Event</button>
+            <button type="button" className="btn btn-glass btn-sm" onClick={() => { const el = document.getElementById('qi') as HTMLTextAreaElement | null; el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); el?.focus(); }}><Lightbulb size={14} />Idea</button>
+            <button type="button" className="btn btn-glass btn-sm" onClick={() => document.getElementById('todo-add')?.focus()}><ListPlus size={14} />To do</button>
+            <button type="button" className="btn btn-glass btn-sm" onClick={openSearch}><Search size={14} />Search <kbd className="kbd">⌘K</kbd></button>
+            <Link className="btn btn-glass btn-sm" to={`/day/${today}`}>Daily plan <ArrowRight size={14} /></Link>
+          </div>
+        </div>
+        <HeroArt />
+      </section>
+
+      <PresetBar editing={edit.on} />
+      <Sortable ids={lay.items.map((i) => i.id)} onMove={lay.move} disabled={!edit.on}>
+        <div className="home-grid hg">
+          {lay.items.map((it) => {
+            const c = custom.find((x) => x.id === it.id);
+            return (
+              <EditableItem key={it.id} item={it} lay={lay} sizes className="hg-card"
+                extra={c && <button type="button" className="ed-btn" aria-label={`Remove ${it.name}`} title="Remove card" onClick={() => lay.set((l) => ({ ...l, custom: (l.custom ?? []).filter((x) => x.id !== c.id), order: (l.order ?? []).filter((x) => x !== c.id) }))}><Trash2 size={14} /></button>}>
+                {c ? (
+                  <section className="glass panel">
+                    <div className="panel-head"><h2>{it.name}</h2></div>
+                    <CustomCardView c={c} lay={lay} />
+                  </section>
+                ) : cards[it.id]}
+              </EditableItem>
+            );
+          })}
+          {edit.on && <button type="button" className="hg-add glass" onClick={() => setAdding(true)}><Plus size={20} /><span>Add card</span></button>}
+        </div>
+      </Sortable>
+      {adding && <AddCardDialog onClose={() => setAdding(false)} onAdd={(c, title) => lay.set((l) => ({ ...l, custom: [...(l.custom ?? []), c], names: { ...(l.names ?? {}), [c.id]: title } }))} />}
     </>
   );
 }
@@ -462,7 +491,7 @@ function WeekStrip({ wk, today, data, hol }: { wk: string; today: string; data?:
   const nav = useNavigate();
   return (
     <div className="week-strip">
-      {DAY_SHORT.map((d, i) => {
+      {weekHead().map((d, i) => {
         const k = addDays(wk, i);
         type Chip = { id: string; label: string; cls: string; run: () => void };
         const chips: Chip[] = [
@@ -514,7 +543,7 @@ function MiniMonth() {
         </span>
       </div>
       <div className="cr-mm" role="grid" aria-label={`${MONTHS[m]} ${y}`}>
-        {DAY_SHORT.map((d) => <span key={d} className="cr-mm-h">{d}</span>)}
+        {weekHead().map((d, i) => <span key={i} className="cr-mm-h">{d}</span>)}
         {Array.from({ length: 42 }, (_, i) => {
           const k = addDays(start, i);
           const out = parseKey(k).m !== m;

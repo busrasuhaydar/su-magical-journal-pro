@@ -1,4 +1,6 @@
 // Project listesi; kart tıklanınca proje çalışma alanı açılır.
+import { DragList, DragRow, SortPicker, sortList, useListPrefs, useReorder } from '../lib/listSort';
+import { PRIORITY_ORDER } from '../lib/types';
 import { useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -22,6 +24,9 @@ export default function ProjectsPage() {
   const coverOf = (p: Project) => files.data?.find((f) => f.id === p.cover_file_id);
   useEnsureCollectionProjects();
   const nfts = useNfts().data;
+  const lp = useListPrefs('projects', 'manual');
+  const reorder = useReorder('projects', [['projects']]);
+  const plist = sortList(projects.data ?? [], lp.mode, { date: (p) => p.target_date ?? p.created_at, priority: (p) => PRIORITY_ORDER[p.priority], name: (p) => p.title });
   const mosaic = (p: Project) => { const slug = p.slug.replace('koleksiyon-', ''); const l = (nfts?.items ?? []).filter((n) => n.c === slug); return [0, 1, 2, 3].map((k) => l[Math.floor((l.length / 4) * k)]?.thumb).filter(Boolean) as string[]; };
 
   return (
@@ -31,11 +36,14 @@ export default function ProjectsPage() {
       </PageHead>
 
       {projects.data?.length === 0 && <section className="glass panel"><Empty title="Your first project">e.g. SU'RÉAL CITY, SAVE ME, Ghost Sculpture…</Empty></section>}
+      <div className="row list-tools"><SortPicker id="psort" mode={lp.mode} onChange={lp.setMode} /></div>
+      <DragList ids={plist.map((p) => p.id)} enabled={lp.mode === 'manual'} onMove={(a, b) => reorder(plist.map((p) => p.id), a, b)}>
       <div className="cards">
-        {projects.data?.map((p) => {
+        {plist.map((p) => {
           const pr = progress.data?.get(p.id);
           return (
-            <div key={p.id} className="glass proj-card pcard" onClick={() => nav(`/projects/${p.slug}`)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && nav(`/projects/${p.slug}`)}>
+            <DragRow key={p.id} id={p.id} enabled={lp.mode === 'manual'} className="card-drag">
+            <div className="glass proj-card pcard" onClick={() => nav(`/projects/${p.slug}`)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && nav(`/projects/${p.slug}`)}>
               <div className="pcard-cover" style={{ background: `linear-gradient(120deg, ${p.color}55, #FFE3D3 60%, #DDF5F8)` }}>{isCollectionProject(p) ? <div className="pcard-mosaic">{mosaic(p).map((u) => <img key={u} src={u} alt="" loading="lazy" />)}</div> : coverOf(p) && <Thumb file={coverOf(p)!} />}<span className="pcard-icon" style={{ borderColor: `${p.color}66` }}>{p.icon ?? '✦'}</span></div>
               <div style={{ padding: '14px 18px 18px', display: 'grid', gap: 8 }}>
               <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -52,9 +60,11 @@ export default function ProjectsPage() {
               {(pr?.overdue_tasks ?? 0) > 0 && <span className="small" style={{ color: 'var(--bad)' }}>⚠ {pr!.overdue_tasks} overdue tasks</span>}
               </div>
             </div>
+            </DragRow>
           );
         })}
       </div>
+      </DragList>
       {edit && <ProjectEditor draft={edit} onClose={() => setEdit(null)} />}
     </>
   );

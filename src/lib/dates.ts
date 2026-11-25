@@ -36,14 +36,21 @@ export function addMonths(k: DayKey, n: number): DayKey {
   return key(t.getUTCFullYear(), t.getUTCMonth(), Math.min(d, daysInMonth(t.getUTCFullYear(), t.getUTCMonth())));
 }
 
-export const startOfWeek = (k: DayKey) => addDays(k, -weekdayOf(k));
+let weekShift = 0; // 0 = Pazartesi, 6 = Pazar, 5 = Cumartesi (takvim tercihi)
+/** Haftanın ilk günü (JS gün numarası: 1 Pzt, 0 Paz, 6 Cmt). */
+export function setWeekStart(js: number) { weekShift = (js + 6) % 7; }
+/** Haftalık sütun (0 = haftanın ilk günü). */
+export const colOf = (k: DayKey) => (weekdayOf(k) - weekShift + 7) % 7;
+/** Haftanın ilk gününe göre döndürülmüş gün başlıkları. */
+export const weekHead = (arr: string[] = WEEKDAYS_SHORT) => [...arr.slice(weekShift), ...arr.slice(0, weekShift)];
+export const startOfWeek = (k: DayKey) => addDays(k, -colOf(k));
 export const startOfMonth = (k: DayKey) => { const { y, m } = parseKey(k); return key(y, m, 1); };
 export const endOfMonth = (k: DayKey) => { const { y, m } = parseKey(k); return key(y, m, daysInMonth(y, m)); };
 
 /** Ay ızgarası: Pazartesi başlangıçlı, boş hücreler null. */
 export function monthMatrix(y: number, m: number): (DayKey | null)[] {
   const first = key(y, m, 1);
-  const cells: (DayKey | null)[] = Array(weekdayOf(first)).fill(null);
+  const cells: (DayKey | null)[] = Array(colOf(first)).fill(null);
   for (let d = 1; d <= daysInMonth(y, m); d++) cells.push(key(y, m, d));
   while (cells.length % 7) cells.push(null);
   return cells;

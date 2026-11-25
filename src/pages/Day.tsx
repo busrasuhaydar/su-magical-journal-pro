@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type PointerEvent as RPE } from 'react';
+import React, { useEffect, useRef, useState, type DragEvent, type PointerEvent as RPE } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Plus, Link2, FileText, Music, Film, StickyNote, Trash2, Maximize2, Upload, ExternalLink, CalendarCheck } from 'lucide-react';
@@ -9,9 +9,10 @@ import { TaskRow } from '../components/TaskRow';
 import { ConfirmButton, Field, formatBytes, useToast } from '../components/ui';
 import { MediaSources } from '../components/Media';
 import { gridItems, useGridHandlers } from './Calendar';
-import { ensureJournalDay, ensureJournalPage, linkFile, pageHref, uploadFile, useAllPages, useCalendarRange, useFiles, useHolidays, useJournal, useJournalPage, useOverdue, useProjects, useSignedUrl, useSoftDelete } from '../lib/data';
+import { ensureJournalDay, ensureJournalPage, linkFile, pageHref, uploadFile, useAllPages, useCalendarRange, useFiles, useHolidays, useJournal, useJournalPage, useOverdue, usePostsRange, useProjects, useSignedUrl, useSoftDelete } from '../lib/data';
+import { EditableItem, Sortable, useEditMode, useLayout } from '../lib/layout';
 import { BlockEditor } from '../components/editor/BlockEditor';
-import { addDays, formatLong, isValidKey, todayKey, type DayKey } from '../lib/dates';
+import { addDays, dayKeyOf, formatLong, isValidKey, todayKey, type DayKey } from '../lib/dates';
 import { supabase } from '../lib/supabase';
 import { countryName, flag } from '../lib/countries';
 import { PLATFORM_LABEL, POST_STATUS_LABEL, type BlockKind, type FileRec, type JournalBlock } from '../lib/types';
@@ -21,6 +22,45 @@ export default function DayPage() {
   const { date } = useParams();
   if (!isValidKey(date)) return <Navigate to={`/day/${todayKey()}`} replace />;
   return <DayInner day={date} key={date} />;
+}
+
+const DAY_SECTIONS: [string, string][] = [['plan', 'Hourly plan'], ['goal', 'Daily goal'], ['mood', 'Mood'], ['pending', 'Pending tasks'], ['untimed', 'Untimed tasks'], ['posts', 'Social media posts'], ['journal', 'Journal'], ['fromday', 'From this day']];
+const MOODS: [string, string][] = [['radiant', '🤩'], ['happy', '😊'], ['calm', '😌'], ['tired', '😴'], ['sad', '😢'], ['anxious', '😟'], ['angry', '😤'], ['inspired', '✨']];
+export const MOOD_LABEL: Record<string, string> = { radiant: 'Radiant', happy: 'Happy', calm: 'Calm', tired: 'Tired', sad: 'Sad', anxious: 'Anxious', angry: 'Angry', inspired: 'Inspired' };
+
+/** Ruh hali: tek dokunuşla seç (journal_days.mood). */
+function MoodPanel({ day, title }: { day: DayKey; title: string }) {
+  const j = useJournal(day);
+  const qc = useQueryClient();
+  const toast = useToast();
+  const cur = j.data?.day?.mood ?? null;
+  async function set(m: string) {
+    try { const jd = await ensureJournalDay(day); const { error } = await supabase.from('journal_days').update({ mood: cur === m ? null : m }).eq('id', jd.id); if (error) throw error; qc.invalidateQueries({ queryKey: ['journal'] }); } catch (x) { toast.fail(x); }
+  }
+  return (
+    <section className="glass panel">
+      <div className="panel-head"><h2>{title}</h2>{cur && <span className="small muted">{MOOD_LABEL[cur] ?? cur}</span>}</div>
+      <div className="moods" role="radiogroup" aria-label={title}>
+        {MOODS.map(([k, e]) => <button key={k} type="button" role="radio" aria-checked={cur === k} className={`mood${cur === k ? ' on' : ''}`} title={MOOD_LABEL[k]} aria-label={MOOD_LABEL[k]} onClick={() => set(k)}>{e}</button>)}
+      </div>
+    </section>
+  );
+}
+
+/** "Bu günden": o gün uygulamaya yüklenen görseller ve yayınlanan gönderiler. */
+function FromThisDay({ day, title }: { day: DayKey; title: string }) {
+  const files = useFiles();
+  const posts = usePostsRange(day, day);
+  const imgs = (files.data ?? []).filter((f) => f.mime.startsWith('image/') && dayKeyOf(f.created_at) === day).slice(0, 12);
+  const pub = (posts.data ?? []).filter((p) => p.status === 'published');
+  if (!imgs.length && !pub.length) return null;
+  return (
+    <section className="glass panel">
+      <div className="panel-head"><h2>{title}</h2><span className="count">{imgs.length + pub.length}</span></div>
+      {imgs.length > 0 && <div className="fromday-grid">{imgs.map((f) => <Link key={f.id} to="/files" className="fromday-img"><Thumb file={f} /></Link>)}</div>}
+      {pub.length > 0 && <div className="task-list" style={{ marginTop: 8 }}>{pub.map((p) => <div key={p.id} className="task-row"><div className="t"><b>✦ {p.title}</b><div className="meta"><span>Published</span>{p.post_targets?.map((t) => <span key={t.id}>{PLATFORM_LABEL[t.platform]}</span>)}</div></div></div>)}</div>}
+    </section>
+  );
 }
 
 function DayInner({ day }: { day: DayKey }) {
@@ -34,6 +74,51 @@ function DayInner({ day }: { day: DayKey }) {
   const hs = hol.byDay.get(day) ?? [];
   const unscheduled = (data.data?.tasks ?? []).filter((t) => !t.starts_at && t.status !== 'cancelled');
   const allDayEvents = (data.data?.events ?? []).filter((e) => e.all_day);
+
+  const edit = useEditMode();
+  const lay = useLayout('day', DAY_SECTIONS.map(([id, label]) => ({ id, label })));
+  const T = (id: string, d: string) => lay.nameOf(id, d);
+  const sections: Record<string, React.ReactNode> = {
+    plan: (
+        <section className="glass panel">
+          <div className="panel-head"><h2>{T('plan', 'Hourly plan')}</h2><span className="small muted">08:00 – 23:00</span></div>
+          {allDayEvents.length > 0 && <div className="row" style={{ marginBottom: 10 }}>{allDayEvents.map((e) => <button type="button" key={e.id} className="pill event" style={{ fontSize: 13, padding: '4px 10px', cursor: 'pointer', border: 0 }} onClick={() => openEvent(e)}>{e.title}</button>)}</div>}
+          <TimeGrid days={[day]} items={gridItems(data.data)} onMove={onMove}
+            onOpen={(it) => (it.kind === 'task' ? openTask(it.rec) : openEvent(it.rec))}
+            onCreate={(d, s) => { const t = movedTimes(d, s, s + 60); openTask({ due_date: d, ...t }); }} />
+        </section>
+    ),
+    goal: <JournalPanel day={day} part="goal" title={T('goal', 'Daily goal')} />,
+    mood: <MoodPanel day={day} title={T('mood', 'Mood')} />,
+    pending: isToday && (overdue.data?.length ?? 0) > 0 ? (
+            <section className="glass panel">
+              <div className="panel-head"><h2>{T('pending', 'Pending tasks')}</h2><span className="count">{overdue.data!.length}</span></div>
+              <p className="small muted" style={{ marginTop: -6 }}>Unfinished tasks don’t disappear. Move them to today, postpone or cancel them.</p>
+              <div className="task-list">{overdue.data!.map((t) => <TaskRow key={t.id} task={t} overdue />)}</div>
+            </section>
+    ) : null,
+    untimed: (
+          <section className="glass panel">
+            <div className="panel-head"><h2>{T('untimed', 'Untimed tasks')}</h2><span className="count">{unscheduled.length}</span></div>
+            {unscheduled.length === 0 ? <p className="small muted">No untimed tasks for this day.</p> :
+              <div className="task-list">{unscheduled.map((t) => <TaskRow key={t.id} task={t} />)}</div>}
+          </section>
+    ),
+    posts: (
+          <section className="glass panel">
+            <div className="panel-head"><h2>{T('posts', 'Social media posts')}</h2><button type="button" className="btn btn-glass btn-sm" onClick={() => openPost({ scheduled_at: movedTimes(day, 19 * 60, 19 * 60).starts_at })}><Plus size={13} />Content</button></div>
+            {(data.data?.posts ?? []).length === 0 ? <p className="small muted">No posts scheduled for this day.</p> : (
+              <div className="task-list">{data.data!.posts.map((p) => (
+                <div key={p.id} className="task-row" onClick={() => openPost(p)} role="button" tabIndex={0}>
+                  <div className="t"><b>{p.title}</b><div className="meta"><span className="mono">{hhmm(minutesOf(p.scheduled_at!))}</span><span>{POST_STATUS_LABEL[p.status]}</span>{p.post_targets?.map((t) => <span key={t.id}>{PLATFORM_LABEL[t.platform]}</span>)}</div></div>
+                </div>
+              ))}</div>
+            )}
+          </section>
+    ),
+    journal: <JournalPanel day={day} part="journal" title={T('journal', 'Journal')} />,
+    fromday: <FromThisDay day={day} title={T('fromday', 'From this day')} />,
+  };
 
   return (
     <>
@@ -65,41 +150,15 @@ function DayInner({ day }: { day: DayKey }) {
         </div>
       )}
 
-      <div className="day-grid">
-        <section className="glass panel">
-          <div className="panel-head"><h2>Hourly plan</h2><span className="small muted">08:00 – 23:00</span></div>
-          {allDayEvents.length > 0 && <div className="row" style={{ marginBottom: 10 }}>{allDayEvents.map((e) => <button type="button" key={e.id} className="pill event" style={{ fontSize: 13, padding: '4px 10px', cursor: 'pointer', border: 0 }} onClick={() => openEvent(e)}>{e.title}</button>)}</div>}
-          <TimeGrid days={[day]} items={gridItems(data.data)} onMove={onMove}
-            onOpen={(it) => (it.kind === 'task' ? openTask(it.rec) : openEvent(it.rec))}
-            onCreate={(d, s) => { const t = movedTimes(d, s, s + 60); openTask({ due_date: d, ...t }); }} />
-        </section>
-
-        <div style={{ display: 'grid', gap: 'var(--s5)' }}>
-          {isToday && (overdue.data?.length ?? 0) > 0 && (
-            <section className="glass panel">
-              <div className="panel-head"><h2>Pending tasks</h2><span className="count">{overdue.data!.length}</span></div>
-              <p className="small muted" style={{ marginTop: -6 }}>Unfinished tasks don’t disappear. Move them to today, postpone or cancel them.</p>
-              <div className="task-list">{overdue.data!.map((t) => <TaskRow key={t.id} task={t} overdue />)}</div>
-            </section>
-          )}
-          <section className="glass panel">
-            <div className="panel-head"><h2>Untimed tasks</h2><span className="count">{unscheduled.length}</span></div>
-            {unscheduled.length === 0 ? <p className="small muted">No untimed tasks for this day.</p> :
-              <div className="task-list">{unscheduled.map((t) => <TaskRow key={t.id} task={t} />)}</div>}
-          </section>
-          <section className="glass panel">
-            <div className="panel-head"><h2>Social media posts</h2><button type="button" className="btn btn-glass btn-sm" onClick={() => openPost({ scheduled_at: movedTimes(day, 19 * 60, 19 * 60).starts_at })}><Plus size={13} />Content</button></div>
-            {(data.data?.posts ?? []).length === 0 ? <p className="small muted">No posts scheduled for this day.</p> : (
-              <div className="task-list">{data.data!.posts.map((p) => (
-                <div key={p.id} className="task-row" onClick={() => openPost(p)} role="button" tabIndex={0}>
-                  <div className="t"><b>{p.title}</b><div className="meta"><span className="mono">{hhmm(minutesOf(p.scheduled_at!))}</span><span>{POST_STATUS_LABEL[p.status]}</span>{p.post_targets?.map((t) => <span key={t.id}>{PLATFORM_LABEL[t.platform]}</span>)}</div></div>
-                </div>
-              ))}</div>
-            )}
-          </section>
-          <JournalPanel day={day} />
+      <Sortable ids={lay.items.map((i) => i.id)} onMove={lay.move} disabled={!edit.on}>
+        <div className="day-grid day-flow">
+          {lay.items.map((it) => {
+            const node = sections[it.id];
+            if (!node && !edit.on) return null;
+            return <EditableItem key={it.id} item={it} lay={lay} className={`day-sec day-${it.id}`}>{node ?? <section className="glass panel"><p className="small muted">{it.name} · nothing to show today</p></section>}</EditableItem>;
+          })}
         </div>
-      </div>
+      </Sortable>
     </>
   );
 }
@@ -113,7 +172,7 @@ function kindOf(mime: string): BlockKind {
   return 'document';
 }
 
-function JournalPanel({ day }: { day: DayKey }) {
+function JournalPanel({ day, part, title }: { day: DayKey; part: 'goal' | 'journal'; title: string }) {
   const qc = useQueryClient();
   const toast = useToast();
   const j = useJournal(day);
@@ -178,12 +237,16 @@ function JournalPanel({ day }: { day: DayKey }) {
 
   const drop = (e: DragEvent) => { e.preventDefault(); setOver(false); onFiles(e.dataTransfer.files); };
 
-  return (
+  if (part === 'goal') return (
     <section className="glass panel">
-      <div className="panel-head"><h2>Journal</h2></div>
-      <Field label="Daily goal">
+      <Field label={title}>
         <input id="goal" className="goal" value={goal} onChange={(e) => setGoal(e.target.value)} onBlur={saveGoal} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} placeholder="What do you want to achieve today?" />
       </Field>
+    </section>
+  );
+  return (
+    <section className="glass panel">
+      <div className="panel-head"><h2>{title}</h2></div>
 
       <JournalEditor day={day} />
       <div className="journal-blocks" style={{ marginTop: 16 }}>

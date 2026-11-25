@@ -46,6 +46,8 @@ import { CertificatePage, KitPrintPage, PriceListPage } from './pages/Print';
 import KitPage from './pages/Kit';
 import TagsPage from './pages/Tags';
 import { todayKey } from './lib/dates';
+import { CAL } from './lib/defs';
+function CalendarDefault() { return <Navigate to={`/calendar/${CAL.view}`} replace />; }
 
 function CrystalCanvas() {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -66,7 +68,7 @@ function App() {
         <Route path="print/kit/:id" element={<KitPrintPage />} />
         <Route element={<Shell />}>
           <Route index element={<Home />} />
-          <Route path="calendar" element={<Navigate to="/calendar/year" replace />} />
+          <Route path="calendar" element={<CalendarDefault />} />
           <Route path="calendar/:view/:date?" element={<CalendarPage />} />
           <Route path="day" element={<Navigate to={`/day/${todayKey()}`} replace />} />
           <Route path="day/:date" element={<DayPage />} />

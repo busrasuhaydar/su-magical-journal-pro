@@ -1,6 +1,6 @@
 // Sayfa görünümü: kapak, yol, simge, başlık, işlemler (favori, geçmiş, geri al/yinele), içindekiler,
 // blok editörü, alt sayfalar ve geri bağlantılar. Proje sayfaları ve proje dışı sayfalar ortak kullanır.
-import { useCallback, useRef, useState, type KeyboardEvent as RKE, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as RKE, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ImagePlus, ListTree, Plus, Redo2, Trash2, Undo2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -65,6 +65,12 @@ export function PageView({ page, pages, projectId, onOpenPage, onCreateChild, ac
     } finally { applying.current = false; }
     to.push(ops); bump((x) => x + 1);
   }
+  const stepRef = useRef(step); stepRef.current = step;
+  useEffect(() => {
+    const h = (e: Event) => { if ((e as CustomEvent<string>).detail === page.id) void stepRef.current('undo'); };
+    document.addEventListener('su:editor-undo', h);
+    return () => document.removeEventListener('su:editor-undo', h);
+  }, [page.id]);
   const onKey = (e: RKE) => {
     const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
     if (!mod || (e.target as HTMLElement).id === 'pg-title') return;
