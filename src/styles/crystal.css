@@ -1047,3 +1047,16 @@ html.zm .cb-turn-cast { display: none !important; }
 .hist-prev .hp-h { font-family: var(--f-serif); margin: 10px 0 4px; }
 .trash-list { max-height: 420px; overflow-y: auto; }
 @media (max-width: 640px) { .hist { grid-template-columns: 1fr; } .hist-list { max-height: 180px; } }
+
+/* ═══ Hızlı yakalama / Gelen kutusu ═══ */
+.qn { padding: 12px 16px; display: grid; gap: 8px; }
+.qn-l { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: var(--rose-600); }
+.qn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.qn-row > .input, .qn-row > .textarea { flex: 1 1 220px; width: auto; min-width: 0; }
+.inbox-list { display: grid; gap: var(--s4, 14px); }
+.inbox-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; padding: 14px; }
+.inbox-thumb { width: 72px; height: 72px; border-radius: 12px; overflow: hidden; background: var(--blush-50); grid-row: span 2; }
+.inbox-body { display: grid; gap: 4px; min-width: 0; }
+.inbox-acts { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
+.inbox-item:not(:has(.inbox-thumb)) { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 720px) { .inbox-acts { grid-column: 2; } }

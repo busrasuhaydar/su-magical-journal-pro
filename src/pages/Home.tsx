@@ -33,6 +33,8 @@ function greeting(min: number) {
 
 interface Item { id: string; at: number; end: number; title: string; sub: string; task?: Task; event?: import('../lib/types').CalEvent; done: boolean }
 
+import { QuickNote } from './Inbox';
+
 export default function Home() {
   const today = todayKey();
   const now = useMinute();
@@ -122,6 +124,7 @@ export default function Home() {
         <HeroArt />
       </section>
 
+      <QuickNote />
       {narrow && <IdeasCard />}
 
       <div className="home-grid">

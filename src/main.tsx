@@ -40,6 +40,7 @@ import ProjectWorkspace from './pages/project/Workspace';
 import OpportunitiesPage from './pages/Opportunities';
 import CommonGallery from './pages/Gallery';
 import PagesPage from './pages/Pages';
+import InboxPage from './pages/Inbox';
 import { todayKey } from './lib/dates';
 
 function CrystalCanvas() {
@@ -72,6 +73,7 @@ function App() {
           <Route path="collections" element={<NftCollectionsPage />} />
           <Route path="collections/:slug" element={<NftCollectionsPage />} />
           <Route path="pages/:id?" element={<PagesPage />} />
+          <Route path="inbox" element={<InboxPage />} />
           <Route path="gallery" element={<CommonGallery />} />
           <Route path="files" element={<FilesPage />} />
           <Route path="settings" element={<SettingsPage />} />
