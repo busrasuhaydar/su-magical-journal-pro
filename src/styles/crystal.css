@@ -1195,3 +1195,6 @@ html.zm .cb-turn-cast { display: none !important; }
 .tag-sugg { position: absolute; left: 0; top: calc(100% + 4px); z-index: 30; min-width: 180px; display: grid; padding: 4px; border-radius: 12px; background: rgba(255,250,252,.98); border: 1px solid #fff; box-shadow: var(--shadow-pop); }
 .tag-sugg button { display: flex; align-items: center; gap: 6px; border: 0; background: none; text-align: left; padding: 6px 8px; border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink-800, #3a1b33); }
 .tag-sugg button:hover { background: rgba(255,214,236,.7); }
+
+/* Menü uzadı: masaüstü sol menüde satırlar biraz daha sık */
+@media (min-width: 801px) { .cr-nav a { padding-top: 7px; padding-bottom: 7px; } }
