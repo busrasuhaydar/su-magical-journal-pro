@@ -5,13 +5,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen, CalendarDays, CalendarHeart, CalendarPlus, CheckSquare, Files, FolderHeart, Gem, Home, Images, Landmark, Lightbulb, ListPlus,
-  LogOut, Megaphone, Pin, Plus, Search, Settings, Sparkles, Users, X, type LucideIcon, BellRing, NotebookPen,
+  LogOut, Megaphone, Pin, Plus, Search, Settings, Sparkles, Users, X, type LucideIcon, BellRing, NotebookPen, NotebookTabs, Inbox, Frame, BriefcaseBusiness, Hash,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getPref, setPref } from '../lib/prefs';
 import { todayKey } from '../lib/dates';
 import { useEditors } from '../components/Editors';
 import { useToast } from '../components/ui';
+import { QuickLinks } from '../components/QuickLinks';
 
 export type NavItem = { to: string; match: string; label: string; short: string; Icon: LucideIcon; hint: string };
 export const NAV: NavItem[] = [
@@ -21,11 +22,16 @@ export const NAV: NavItem[] = [
   { to: '/tasks', match: '/tasks', label: 'Tasks', short: 'Tasks', Icon: CheckSquare, hint: 'All to-dos' },
   { to: '/projects', match: '/projects', label: 'My Projects', short: 'Projects', Icon: FolderHeart, hint: 'Exhibitions, collections' },
   { to: '/gallery', match: '/gallery', label: 'Gallery', short: 'Gallery', Icon: Images, hint: 'Shared gallery, NFT artworks' },
+  { to: '/artworks', match: '/artworks', label: 'Artworks', short: 'Artworks', Icon: Frame, hint: 'Inventory, certificates, price lists' },
   { to: '/collections', match: '/collections', label: 'My Collections', short: 'Collection', Icon: Gem, hint: '530 artworks' },
+  { to: '/inbox', match: '/inbox', label: 'Inbox', short: 'Inbox', Icon: Inbox, hint: 'Shared & quick notes' },
+  { to: '/pages', match: '/pages', label: 'Pages', short: 'Pages', Icon: NotebookTabs, hint: 'Free pages, notes' },
   { to: '/ideas', match: '/ideas', label: 'Ideas & Notes', short: 'Notes', Icon: Lightbulb, hint: 'On My Mind' },
   { to: '/opportunities', match: '/opportunities', label: 'Exhibitions & Opportunities', short: 'Opportunities', Icon: Landmark, hint: 'Applications, dates' },
+  { to: '/kit', match: '/kit', label: 'Application Kit', short: 'Kit', Icon: BriefcaseBusiness, hint: 'Bio, CV, statement · TR/EN' },
   { to: '/social', match: '/social', label: 'Social Media', short: 'Social', Icon: Megaphone, hint: 'Posting plan' },
   { to: '/contacts', match: '/contacts', label: 'Contacts', short: 'Contacts', Icon: Users, hint: 'Galleries, curators' },
+  { to: '/tags', match: '/tags', label: 'Tags', short: 'Tags', Icon: Hash, hint: 'Everything by #tag' },
   { to: '/files', match: '/files', label: 'Files', short: 'Files', Icon: Files, hint: 'Documents, images' },
   { to: '/settings', match: '/settings', label: 'Settings', short: 'Settings', Icon: Settings, hint: 'Preferences, notifications' },
 ];
@@ -132,6 +138,7 @@ export function IndexSheet({ onClose, pins, setPins }: { onClose: () => void; pi
           <div className="cr-recent-row">{recent.map((n) => <Link key={n.match} to={n.to} onClick={onClose} className="chip"><n.Icon size={13} />{n.short}</Link>)}</div>
         </div>
       )}
+      <QuickLinks onNavigate={onClose} compact />
       <div className="cr-index">
         {NAV.map((n) => {
           const on = isActive(loc.pathname, n);

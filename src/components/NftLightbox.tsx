@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
-import { CheckSquare, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Expand, FilePlus2, Lightbulb, Maximize, Share2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { CheckSquare, ChevronLeft, ChevronRight, Copy, Download, ExternalLink, Expand, FilePlus2, Frame, Lightbulb, Maximize, Share2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { useProjects } from '../lib/data';
 import { artKey, copyImage, projectSlug, saveOriginal, shareOriginal, useArtworkPages, type Nft } from '../lib/nft';
 import { supabase } from '../lib/supabase';
 import { useEditors } from './Editors';
 import { useToast } from './ui';
+import { ART_STATUS_SHORT, useArtworks } from '../lib/artworks';
+import { openOrCreateFromNft } from '../pages/Artworks';
 
 export const nftKey = (n: Nft) => `${n.contract}-${n.tokenId}`;
 
@@ -273,6 +275,7 @@ export function Lightbox({ items, index, setIndex, onClose }: { items: Nft[]; in
               {n.original && <a className="btn btn-glass btn-sm" href={n.original} target="_blank" rel="noreferrer"><Expand size={13} />Original link</a>}
               <button type="button" className="btn btn-copy btn-sm icon-only" title="Copy title + description" aria-label="Copy title and description" onClick={() => copy(detail, 'Title and description')}><Copy size={14} /></button>
             </div>
+            <InventoryButton n={n} />
             <Workbench key={nftKey(n)} n={n} />
           </div>
         </div>
@@ -284,5 +287,20 @@ export function Lightbox({ items, index, setIndex, onClose }: { items: Nft[]; in
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** Eser envanterine bağlantı: kayıt varsa açar, yoksa NFT bilgileriyle oluşturur. */
+function InventoryButton({ n }: { n: Nft }) {
+  const nav = useNavigate();
+  const toast = useToast();
+  const arts = useArtworks();
+  const has = arts.data?.find((a) => a.nft_key === artKey(n));
+  return (
+    <div className="row" style={{ gap: 6 }}>
+      <button type="button" className="btn btn-glass btn-sm" onClick={async () => { try { const id = has?.id ?? await openOrCreateFromNft(n); nav(`/artworks/${id}`); } catch (x) { toast.fail(x); } }}>
+        <Frame size={13} />{has ? `Inventory · ${ART_STATUS_SHORT[has.status]}` : 'Add to inventory'}
+      </button>
+    </div>
   );
 }

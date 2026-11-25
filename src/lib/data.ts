@@ -6,7 +6,11 @@ import { supabase, sha256, slugify } from './supabase';
 import { addDays, addMonths, toInstant, todayKey, type DayKey } from './dates';
 import type { CalEvent, CalendarEntry, FileRec, Holiday, JournalBlock, JournalDay, Profile, Project, ProjectProgress, Task } from './types';
 
-export const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 } } });
+export const queryClient = new QueryClient({ defaultOptions: {
+  // offlineFirst: çevrimdışıyken önbellekteki (IndexedDB) veri gösterilir; yazmalar her zaman çalışır (kuyruğa düşer)
+  queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1, networkMode: 'offlineFirst', gcTime: 7 * 24 * 3600_000 },
+  mutations: { networkMode: 'always' },
+} });
 
 async function run<T>(p: PromiseLike<{ data: T | null; error: unknown }>): Promise<T> {
   const { data, error } = await p;
@@ -53,6 +57,12 @@ const TABLE_KEYS: Record<string, string[][]> = {
   opportunities: [['opps'], ['year']],
   opportunity_dates: [['opps'], ['year'], ['cal']],
   project_opportunities: [['opps']],
+  backups: [['backups']],
+  inbox_items: [['inbox']],
+  artworks: [['artworks']],
+  application_kit: [['kit']],
+  tags: [['tags']],
+  tag_links: [['tags']],
 };
 export function useRealtime(enabled: boolean) {
   const qc = useQueryClient();
@@ -475,7 +485,21 @@ export function usePages(projectId: string) {
   return useQuery({ queryKey: ['pages', projectId], queryFn: () => run<Page[]>(supabase.from('pages').select('*').eq('project_id', projectId).is('deleted_at', null).order('position')) });
 }
 export function useAllPages() {
-  return useQuery({ queryKey: ['pages', 'all'], queryFn: () => run<Page[]>(supabase.from('pages').select('id,project_id,title,icon,parent_id,position,updated_at,artwork_key').is('deleted_at', null)) });
+  return useQuery({ queryKey: ['pages', 'all'], queryFn: () => run<Page[]>(supabase.from('pages').select('id,project_id,title,icon,parent_id,position,updated_at,artwork_key,journal_day').is('deleted_at', null)) });
+}
+/** Günlük sayfası (Day.tsx): o güne ait pages kaydı. */
+export function useJournalPage(day: DayKey) {
+  return useQuery({ queryKey: ['pages', 'journal', day], queryFn: async () => (await run<Page[]>(supabase.from('pages').select('*').eq('journal_day', day).is('deleted_at', null).limit(1)))[0] ?? null });
+}
+export async function ensureJournalPage(day: DayKey, title: string): Promise<Page> {
+  return run<Page>(supabase.from('pages').upsert({ journal_day: day, title, icon: '📔', project_id: null, position: 0 }, { onConflict: 'owner_id,journal_day' }).select().single());
+}
+/** Sayfanın adresi: projede ise proje sekmesi, değilse /pages. */
+export function pageHref(pg: { id: string; project_id: string | null; journal_day?: string | null } | undefined, projects: Project[] | undefined) {
+  if (!pg) return '/pages';
+  if (pg.journal_day) return `/day/${pg.journal_day}`;
+  const p = pg.project_id ? projects?.find((x) => x.id === pg.project_id) : undefined;
+  return p ? `/projects/${p.slug}/pages/${pg.id}` : `/pages/${pg.id}`;
 }
 export function usePageBlocks(pageId: string | null) {
   return useQuery({ queryKey: ['blocks', pageId], enabled: !!pageId, queryFn: () => run<PageBlock[]>(supabase.from('page_blocks').select('*').eq('page_id', pageId!).order('position')) });

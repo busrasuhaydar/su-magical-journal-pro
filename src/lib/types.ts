@@ -84,14 +84,14 @@ export const POST_STATUS_COLOR: Record<PostStatus, string> = { idea: '#CDB9F3', 
 
 // ── Gelişmiş projeler + Faz 3 ──────────────────────────
 export interface FileLink { id: string; file_id: string; entity_type: string; entity_id: string; caption: string | null; note: string | null; position: number; created_at: string }
-export interface Page { id: string; project_id: string; parent_id: string | null; title: string; icon: string | null; position: number; updated_at: string; artwork_key?: string | null }
+export interface Page { id: string; project_id: string | null; parent_id: string | null; title: string; icon: string | null; position: number; updated_at: string; artwork_key?: string | null; journal_day?: string | null; cover_file_id?: string | null }
 export type BlockType = 'text' | 'h1' | 'h2' | 'h3' | 'bullet' | 'numbered' | 'todo' | 'quote' | 'callout' | 'divider' | 'image' | 'file' | 'link' | 'task' | 'page';
 export interface PageBlock { id: string; page_id: string; type: BlockType; content: { text?: string; checked?: boolean; url?: string; title?: string; caption?: string }; file_id: string | null; task_id: string | null; ref_page_id: string | null; position: number }
 export interface EntityLink { id: string; from_type: string; from_id: string; to_type: string; to_id: string; created_at: string }
 export type OppStatus = 'to_review' | 'potential' | 'preparing' | 'submitted' | 'awaiting' | 'accepted' | 'rejected' | 'exhibiting' | 'completed' | 'withdrawn';
 export type OppKind = 'exhibition' | 'fair' | 'open_call' | 'competition' | 'residency' | 'gallery' | 'program' | 'event' | 'grant';
 export type OppDateKind = 'app_open' | 'deadline' | 'announcement' | 'delivery' | 'install' | 'opening' | 'closing';
-export interface RequiredDoc { label: string; done: boolean; file_id?: string | null }
+export interface RequiredDoc { label: string; done: boolean; file_id?: string | null; kit_id?: string | null }
 export interface Opportunity {
   id: string; title: string; kind: OppKind; organization: string | null; gallery: string | null; city: string | null; country: string | null;
   fee_amount: number | null; fee_currency: string | null; fee_note: string | null; requirements: string | null; artwork_requirements: string | null;

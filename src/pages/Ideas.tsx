@@ -5,6 +5,7 @@ import { FolderHeart, Gem, Plus, Sparkles } from 'lucide-react';
 import { useNfts } from '../lib/nft';
 import { PageHead } from '../components/Shell';
 import { ConfirmButton, Dialog, Empty, Field, useToast } from '../components/ui';
+import { TagList, TagPicker } from '../components/TagPicker';
 import { useIdeas, useProjects, useRowMutation, useSoftDelete } from '../lib/data';
 import { dayKeyOf, formatShort } from '../lib/dates';
 import { slugify, supabase } from '../lib/supabase';
@@ -38,6 +39,7 @@ export default function IdeasPage() {
             <div key={i.id} className="glass panel proj-card" onClick={() => setEdit(i)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setEdit(i)} style={{ opacity: i.status === 'archived' ? 0.6 : 1 }}>
               <div className="row" style={{ justifyContent: 'space-between' }}><span className="chip">{IDEA_CATEGORY_LABEL[i.category]}</span><span className="small muted">{formatShort(dayKeyOf(i.created_at))}</span></div>
               <h3>{i.title}</h3>
+              <TagList type="idea" id={i.id} />
               {i.body && <p className="small" style={{ margin: 0, whiteSpace: 'pre-wrap', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{i.body}</p>}
               {proj && <span className="small" style={{ color: 'var(--teal-600)' }}>✓ Turned into project: {proj.title}</span>}
               {(linked || work) && <div className="row" style={{ gap: 6 }} onClick={(e) => e.stopPropagation()}>
@@ -86,6 +88,7 @@ function IdeaEditor({ draft, onClose }: { draft: Partial<Idea>; onClose: () => v
     <Dialog title={draft.id ? 'Idea' : 'New idea'} onClose={onClose}>
       <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
         <Field label="Title"><input id="id-title" className="input" value={f.title} onChange={set('title')} placeholder="e.g. City sculpture inside a glass sphere" /></Field>
+        {draft.id && <div className="field"><span>Tags</span><TagPicker type="idea" id={draft.id} /></div>}
         <Field label="Details"><textarea id="id-body" className="textarea" style={{ minHeight: 140 }} value={f.body} onChange={set('body')} /></Field>
         <div className="grid-2">
           <Field label="Category"><select id="id-cat" className="select" value={f.category} onChange={set('category')}>{Object.entries(IDEA_CATEGORY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>

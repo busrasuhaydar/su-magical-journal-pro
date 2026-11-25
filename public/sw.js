@@ -16,8 +16,25 @@ self.addEventListener('notificationclick', (event) => {
   }));
 });
 
+// Paylaşım hedefi (share_target): paylaşılan metin/bağlantı/görsel önce cihazda saklanır,
+// uygulama "Gelen kutusu" açılınca yükler. Oturum service worker'da olmadığı için yükleme uygulamada yapılır.
+async function receiveShare(request) {
+  const form = await request.formData();
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const cache = await caches.open('su-share');
+  const files = form.getAll('media').filter((f) => f && typeof f === 'object' && f.size);
+  for (let i = 0; i < files.length; i++) {
+    await cache.put(`/__share/${id}/file-${i}`, new Response(files[i], { headers: { 'Content-Type': files[i].type || 'application/octet-stream', 'X-Name': encodeURIComponent(files[i].name || 'shared') } }));
+  }
+  const meta = { id, title: form.get('title') || '', text: form.get('text') || '', url: form.get('url') || '', files: files.length, at: Date.now() };
+  await cache.put(`/__share/${id}/meta`, new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } }));
+  return Response.redirect(new URL('inbox?shared=1', self.registration.scope).href, 303);
+}
+
 // Çevrim dışıyken uygulama kabuğunu aç; veriler her zaman ağdan gelir.
 self.addEventListener('fetch', (event) => {
+  const u = new URL(event.request.url);
+  if (event.request.method === 'POST' && u.href.startsWith(self.registration.scope) && u.pathname.endsWith('/share-target')) { event.respondWith(receiveShare(event.request)); return; }
   if (event.request.mode !== 'navigate') return;
   event.respondWith(fetch(event.request).catch(() => caches.match(self.registration.scope)));
 });

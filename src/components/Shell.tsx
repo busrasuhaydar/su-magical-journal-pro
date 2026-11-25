@@ -13,6 +13,8 @@ import { PageCorners } from '../crystal/PageCorners';
 import { useApplyBackground, useLookUrl } from '../crystal/look';
 import { NotificationBell } from './NotificationBell';
 import { QuickSearch } from './QuickSearch';
+import { OfflineBadge } from './OfflineBadge';
+import { QuickLinks } from './QuickLinks';
 
 function useNow() {
   const [now, setNow] = useState(() => new Date());
@@ -140,6 +142,7 @@ export function Shell() {
               </Link>
             ))}
           </nav>
+          <QuickLinks />
           <div className="cr-left-foot">
             <button type="button" className="btn btn-primary" onClick={() => setDeskNew(true)}><Plus size={16} /><span className="lbl">Add to journal</span></button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut().then(() => nav('/'))}><LogOut size={14} /><span className="lbl">Sign out</span></button>
@@ -151,6 +154,7 @@ export function Shell() {
           <header className="cb-top">
             <Link to="/" className="cb-top-brand">Su's Magical Journal</Link>
             <div className="utilbar">
+              <OfflineBadge />
               <QuickSearch />
               <NotificationBell />
             </div>
