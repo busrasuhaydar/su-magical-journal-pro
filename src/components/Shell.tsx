@@ -1,3 +1,5 @@
+import { CanvasLayer, ContextMenuLayer } from './FreeCanvas';
+import { BoxOverlay, useFreeformEngine } from '../lib/freeform';
 import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -125,6 +127,7 @@ function ShellInner() {
   const profile = useProfile();
   applyDefs(profile.data?.ui_prefs?.defs);
   applyCalendar(profile.data?.ui_prefs?.calendar);
+  useFreeformEngine();
   const calNav = NAV.find((n) => n.match === '/calendar'); if (calNav) calNav.to = `/calendar/${CAL.view}`;
   const look = profile.data?.ui_prefs?.look;
   useEffect(() => { applyLook(look); }, [JSON.stringify(look ?? {})]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -166,14 +169,19 @@ function ShellInner() {
             </div>
           </header>
           <div className="cb-scroll">
-            <EditBar />
-            <main className="main"><Outlet /></main>
+            <div className="free-wrap">
+              <EditBar />
+              <main className="main"><Outlet /></main>
+              <CanvasLayer />
+            </div>
           </div>
           <PageCorners />
         </section>
       </div>
       <Decor />
       <Dock />
+      <BoxOverlay />
+      <ContextMenuLayer />
       {deskNew && <CreateSheet onClose={() => setDeskNew(false)} />}
     </div>
   );

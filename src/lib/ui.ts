@@ -10,6 +10,7 @@ export interface UiPrefs {
   titles?: Record<string, string>; hide?: string[]; boston?: boolean; avatar?: string | null; bg?: string | null; favorites?: NavRef[]; recent_items?: NavRef[];
   layout?: Record<string, import('./layout').ScreenLayout>; home_presets?: Record<string, import('./layout').ScreenLayout>; home_active?: string;
   dock?: string[]; nav_pins?: NavRef[]; sort?: Record<string, string>; view?: Record<string, string>;
+  boxes?: Record<string, Record<string, import('./freeform').Box>>; renames?: Record<string, string>; hidden_ui?: string[]; canvas?: Record<string, import('./freeform').CanvasItem[]>;
   defs?: import('./defs').Defs; calendar?: import('./defs').CalPrefs; look?: import('./defs').LookPrefs; recent_blocks?: string[];
 }
 export function useHomePrefs() {

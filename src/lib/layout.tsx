@@ -6,7 +6,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Check, Eye, EyeOff, GripVertical, Pencil, RotateCcw, type LucideIcon } from 'lucide-react';
+import { Check, Eye, EyeOff, GripVertical, Link2, Pencil, RotateCcw, StickyNote, type LucideIcon } from 'lucide-react';
 import { useProfile } from './data';
 import { usePrefsWriter, type UiPrefs } from './ui';
 import { ICONS, iconOf } from './icons';
@@ -177,7 +177,7 @@ export function EditBar() {
   const list = [...screens].filter((s) => s !== 'nav');
   return (
     <div className="ed-bar" ref={ref} role="status">
-      <span className="ed-bar-t"><Pencil size={14} /> Drag <GripVertical size={13} /> to reorder · <Eye size={13} /> hide · <Pencil size={12} /> rename</span>
+      <span className="ed-bar-t"><Pencil size={14} /> Drag <GripVertical size={13} /> to move · pull edges to resize · <Eye size={13} /> hide · <Pencil size={12} /> rename · right-click anywhere</span>
       {ask ? (
         <span className="row" style={{ gap: 6 }}>
           <span className="small">Reset this screen?</span>
@@ -185,6 +185,10 @@ export function EditBar() {
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAsk(false)}>No</button>
         </span>
       ) : <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAsk(true)}><RotateCcw size={13} />Reset to default</button>}
+      <span className="row" style={{ gap: 4 }}>
+        <button type="button" className="btn btn-glass btn-sm" onClick={() => document.dispatchEvent(new CustomEvent('su:add-canvas', { detail: { kind: 'note' } }))}><StickyNote size={13} />Note</button>
+        <button type="button" className="btn btn-glass btn-sm" onClick={() => document.dispatchEvent(new CustomEvent('su:add-canvas', { detail: { kind: 'link' } }))}><Link2 size={13} />Link button</button>
+      </span>
       <button type="button" className="btn btn-primary btn-sm" onClick={() => set(false)}><Check size={14} />Done</button>
     </div>
   );
