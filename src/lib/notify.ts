@@ -45,3 +45,14 @@ export async function pushActive() {
   const reg = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
   return !!(await reg?.pushManager.getSubscription());
 }
+
+/** Herhangi bir edge function'ı kullanıcının oturumuyla çağırır; hata mesajını gövdeden okur. */
+export async function callFunction<T = unknown>(name: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) {
+    let msg = error.message;
+    try { const j = await (error as { context?: Response }).context?.json(); if (j?.error) msg = j.error; } catch { /* yok say */ }
+    throw new Error(msg);
+  }
+  return data as T;
+}

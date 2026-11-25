@@ -1,4 +1,5 @@
 import { REMINDER_OPTIONS } from '../lib/types';
+import { BackupSettings } from './settings/Backups';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarHeart, FolderHeart, Files, CalendarDays, Download, RotateCcw, ImagePlus, Trash2, UserRound } from 'lucide-react';
@@ -68,6 +69,8 @@ export default function SettingsPage() {
       <NotificationSettings />
       <AccountSettings />
       <ReminderSettings />
+
+      <BackupSettings />
 
       <section className="glass panel">
         <div className="panel-head"><h2>My Data</h2></div>

@@ -996,3 +996,10 @@ html.zm .cb-turn-cast { display: none !important; }
 .pf-ushade { background: linear-gradient(to top, rgba(60,10,50,0) 0 50%, rgba(60,10,50,.42) 50%, rgba(60,10,50,.14) 62%, rgba(60,10,50,0) 85%); }
 /* katlanan parçada kıvrım: çizgide koyu, hemen ardından parlak ışık bandı, sonra yumuşak gölge */
 .pf-fshade { background: linear-gradient(to top, rgba(0,0,0,0) 0 50%, rgba(90,20,80,.3) 50%, rgba(255,255,255,.75) 56%, rgba(255,255,255,0) 66%, rgba(90,20,80,.12) 88%, rgba(90,20,80,.2) 100%); }
+
+/* ═══ Yedekleme (Ayarlar) ═══ */
+.bk-drive { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--glass-edge); background: rgba(255,255,255,.35); }
+.bk-drive > span { flex: 1 1 220px; min-width: 0; }
+.bk-list { display: grid; gap: 8px; }
+.bk-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.4); border: 1px solid var(--glass-edge); }
+.bk-main { display: grid; gap: 2px; min-width: 0; flex: 1 1 220px; }

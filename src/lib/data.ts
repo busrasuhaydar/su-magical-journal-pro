@@ -53,6 +53,7 @@ const TABLE_KEYS: Record<string, string[][]> = {
   opportunities: [['opps'], ['year']],
   opportunity_dates: [['opps'], ['year'], ['cal']],
   project_opportunities: [['opps']],
+  backups: [['backups']],
 };
 export function useRealtime(enabled: boolean) {
   const qc = useQueryClient();
