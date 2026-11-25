@@ -1023,3 +1023,7 @@ html.zm .cb-turn-cast { display: none !important; }
   .block-gutter .bg-btn[draggable] { display: none; }
   .block-menu { left: 8px; right: 8px; width: auto; }
 }
+
+/* ═══ ⌘K içerik araması ═══ */
+.cmdk-snip { display: block; padding: 0 12px 8px 42px; margin-top: -4px; font-size: 12.5px; color: var(--ink-500); line-height: 1.45; overflow-wrap: anywhere; }
+.cmdk-snip mark { background: rgba(255,201,77,.45); color: inherit; border-radius: 3px; padding: 0 2px; }

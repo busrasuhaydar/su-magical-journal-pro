@@ -1,5 +1,7 @@
 // Quick search (⌘K / Ctrl+K): projeler, sayfalar, görevler, içerikler, kişiler, fırsatlar, fikirler ve sayfalar arası geçiş.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { pageHref, useAllPages, useContacts, useIdeas, useOpportunities, usePosts, useProjects, useTasks } from '../lib/data';
@@ -7,7 +9,13 @@ import { dayKeyOf, formatRelative, todayKey } from '../lib/dates';
 import { useEditors } from './Editors';
 import { useNfts } from '../lib/nft';
 
-type Item = { group: string; label: string; hint?: string; icon: string; run: () => void };
+type Item = { group: string; label: string; hint?: string; icon: string; run: () => void; snippet?: string };
+type Hit = { kind: 'page' | 'journal' | 'note' | 'idea'; id: string; parent_id: string | null; title: string; snippet: string };
+
+/** «eşleşme» işaretlerini vurgular. */
+function Snippet({ text }: { text: string }) {
+  return <span className="cmdk-snip">{text.split(/(«[^»]*»)/).map((part, i) => (part.startsWith('«') ? <mark key={i}>{part.slice(1, -1)}</mark> : part))}</span>;
+}
 const norm = (s: string) => s.toLocaleLowerCase('en').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i');
 
 export function QuickSearch() {
@@ -54,11 +62,28 @@ function Palette({ onClose }: { onClose: () => void }) {
     ...(ideas.data ?? []).map((i) => ({ group: 'Ideas', label: i.title, icon: '💡', run: go('/ideas') })),
   ], [projects.data, pages.data, tasks.data, posts.data, opps.data, contacts.data, ideas.data, nfts.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // İçerikte tam metin arama (sayfa blokları, günlük, notlar, fikirler) — 250 ms gecikmeli
+  const [dq, setDq] = useState('');
+  useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
+  const hits = useQuery({ queryKey: ['search', dq], enabled: dq.length >= 2 && !dq.startsWith('#'), staleTime: 10_000, queryFn: async () => {
+    const { data, error } = await supabase.rpc('search_content', { q: dq, max_rows: 20 });
+    if (error) throw error; return data as Hit[];
+  } });
+  const contentItems: Item[] = useMemo(() => (hits.data ?? []).map((h) => {
+    const pg = h.kind === 'page' ? pages.data?.find((x) => x.id === h.id) : undefined;
+    const proj = h.parent_id ? projects.data?.find((x) => x.id === h.parent_id) : undefined;
+    const to = h.kind === 'page' ? pageHref(pg ?? { id: h.id, project_id: h.parent_id }, projects.data)
+      : h.kind === 'journal' ? `/day/${h.title}` : h.kind === 'note' && proj ? `/projects/${proj.slug}/notes` : '/ideas';
+    const label = h.kind === 'journal' ? `Journal · ${formatRelative(h.title)}` : pg?.journal_day ? `Journal · ${formatRelative(pg.journal_day)}` : h.title;
+    return { group: 'In content', label, hint: { page: 'Page', journal: 'Journal', note: 'Note', idea: 'Idea' }[h.kind], icon: { page: '📄', journal: '📔', note: '🗒️', idea: '💡' }[h.kind], snippet: h.snippet, run: go(to) };
+  }), [hits.data, pages.data, projects.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const results = useMemo(() => {
     const n = norm(q.trim());
     if (!n) return all.filter((i) => i.group === 'Quick actions' || i.group === 'Go' || i.group === 'Projects').slice(0, 30);
-    return all.filter((i) => norm(`${i.label} ${i.hint ?? ''}`).includes(n)).sort((a, b) => Number(!norm(a.label).startsWith(n)) - Number(!norm(b.label).startsWith(n))).slice(0, 40);
-  }, [q, all]);
+    const titles = all.filter((i) => norm(`${i.label} ${i.hint ?? ''}`).includes(n)).sort((a, b) => Number(!norm(a.label).startsWith(n)) - Number(!norm(b.label).startsWith(n))).slice(0, 40);
+    return [...titles, ...contentItems];
+  }, [q, all, contentItems]);
   useEffect(() => setSel(0), [q]);
 
   const key = (e: React.KeyboardEvent) => {
@@ -73,10 +98,10 @@ function Palette({ onClose }: { onClose: () => void }) {
       <div className="cmdk" role="dialog" aria-label="Quick search">
         <input ref={input} id="cmdk-q" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={key} placeholder="Search: project, task, content, contact, page…" autoComplete="off" />
         <div className="cmdk-list">
-          {results.length === 0 && <p className="small muted" style={{ padding: 12 }}>No results.</p>}
+          {results.length === 0 && <p className="small muted" style={{ padding: 12 }}>{hits.isFetching ? 'Searching…' : 'No results.'}</p>}
           {results.map((r, i) => {
             const head = r.group !== last ? <div className="cmdk-group">{r.group}</div> : null; last = r.group;
-            return <div key={i}>{head}<button type="button" className={`cmdk-item${i === sel ? ' on' : ''}`} onMouseEnter={() => setSel(i)} onClick={r.run}><span>{r.icon}</span><span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>{r.hint && <span className="k">{r.hint}</span>}</button></div>;
+            return <div key={i}>{head}<button type="button" className={`cmdk-item${i === sel ? ' on' : ''}`} onMouseEnter={() => setSel(i)} onClick={r.run}><span>{r.icon}</span><span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>{r.hint && <span className="k">{r.hint}</span>}</button>{r.snippet && <Snippet text={r.snippet} />}</div>;
           })}
         </div>
       </div>
