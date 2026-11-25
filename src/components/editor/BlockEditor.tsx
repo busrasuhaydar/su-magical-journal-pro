@@ -12,7 +12,7 @@ import { TaskRow } from '../TaskRow';
 import { Dialog, useToast } from '../ui';
 import { MediaSources, Thumb } from '../Media';
 import { useProjectGallery } from '../../pages/project/Gallery';
-import { HAS_MARKUP, renderInline } from './inline';
+import { HAS_MARKUP, PAGE_TOKEN, renderInline } from './inline';
 
 export type PageLite = Pick<Page, 'id' | 'title' | 'icon' | 'parent_id' | 'project_id'> & { journal_day?: string | null };
 type Op = { before: PageBlock | null; after: PageBlock | null };
@@ -60,6 +60,9 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
   const [slashSel, setSlashSel] = useState(0);
   const [picker, setPicker] = useState<{ type: PickType; id: string } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+  const [mention, setMention] = useState<{ id: string; start: number; end: number; q: string } | null>(null);
+  const [mentionSel, setMentionSel] = useState(0);
+  const mentionIds = useRef<Set<string> | null>(null);
 
   const setList = useCallback((next: PageBlock[]) => { listRef.current = next; setListS(next); onText?.(next); }, [onText]);
 
@@ -89,7 +92,25 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
     }
     onOps?.(ops);
     qc.invalidateQueries({ queryKey: ['pages'] });
-  }, [toast, onOps, qc]);
+    void syncMentions();
+  }, [toast, onOps, qc]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** [[sayfa]] bağlantılarını entity_links'e yazar (from_type = page_mention). */
+  async function syncMentions() {
+    const want = new Set<string>();
+    for (const b of listRef.current) for (const m of (b.content.text ?? '').matchAll(PAGE_TOKEN)) if (m[1] !== pageId) want.add(m[1]);
+    if (!mentionIds.current) {
+      const { data } = await supabase.from('entity_links').select('to_id').eq('from_type', 'page_mention').eq('from_id', pageId).eq('to_type', 'page');
+      mentionIds.current = new Set((data ?? []).map((r) => r.to_id as string));
+    }
+    const have = mentionIds.current;
+    const add = [...want].filter((x) => !have.has(x)), del = [...have].filter((x) => !want.has(x));
+    if (!add.length && !del.length) return;
+    mentionIds.current = want;
+    if (add.length) await supabase.from('entity_links').insert(add.map((to_id) => ({ from_type: 'page_mention', from_id: pageId, to_type: 'page', to_id })));
+    if (del.length) await supabase.from('entity_links').delete().eq('from_type', 'page_mention').eq('from_id', pageId).eq('to_type', 'page').in('to_id', del);
+    qc.invalidateQueries({ queryKey: ['links'] });
+  }
 
   const flush = useCallback(() => {
     window.clearTimeout(timer.current);
@@ -132,7 +153,7 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
     gone.current.add(id); dirty.current.delete(id); saved.current.delete(id);
     setList(listRef.current.filter((b) => b.id !== id));
     const { error } = await supabase.from('page_blocks').delete().eq('id', id);
-    if (error) toast.fail(error); else if (before) onOps?.([{ before, after: null }]);
+    if (error) toast.fail(error); else { if (before) onOps?.([{ before, after: null }]); void syncMentions(); }
   }
   /** Geri al/yinele: bir bloğu verilen sürüme getirir (null = sil). */
   const applyVersion = useCallback(async (id: string, v: PageBlock | null) => {
@@ -162,6 +183,30 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
   const slashItems = useMemo(() => (slashQ == null ? [] : BLOCK_MENU.filter(([, l, , a]) => `${l} ${a}`.toLocaleLowerCase('en').includes(slashQ.toLocaleLowerCase('en').trim()))), [slashQ]);
   useEffect(() => setSlashSel(0), [slashQ]);
 
+  // "[[" sayfa seçici
+  const mentionItems = useMemo(() => {
+    if (!mention) return [];
+    const n = mention.q.toLocaleLowerCase('en');
+    return pages.filter((p) => p.id !== pageId && !p.journal_day && p.title.toLocaleLowerCase('en').includes(n)).slice(0, 8);
+  }, [mention, pages, pageId]);
+  useEffect(() => setMentionSel(0), [mention?.q]);
+  async function pickMention(target: PageLite | 'new') {
+    if (!mention) return;
+    const b = listRef.current.find((x) => x.id === mention.id); if (!b) return;
+    let pg: PageLite;
+    if (target === 'new') {
+      const title = mention.q.trim() || 'Untitled page';
+      const { data, error } = await supabase.from('pages').insert({ title, icon: '📄', project_id: projectId, parent_id: null, position: Date.now() / 1e6 }).select().single();
+      if (error) { toast.fail(error); return; }
+      pg = data as PageLite; qc.invalidateQueries({ queryKey: ['pages'] });
+    } else pg = target;
+    const text = b.content.text ?? '';
+    const token = `[[page:${pg.id}|${pg.title.replace(/[\]|]/g, '')}]] `;
+    change(b.id, { content: { ...b.content, text: text.slice(0, mention.start) + token + text.slice(mention.end) } }, true);
+    focusReq.current = { id: b.id, at: mention.start + token.length };
+    setMention(null);
+  }
+
   function choose(type: BlockType, id: string) {
     setMenu(null);
     if (type === 'image' || type === 'file' || type === 'task' || type === 'page') { setPicker({ type, id }); return; }
@@ -177,7 +222,9 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
     if (!isText(type)) choose(type, b.id);
   }
 
-  function onTextChange(b: PageBlock, text: string) {
+  function onTextChange(b: PageBlock, text: string, caret = text.length) {
+    const m = /\[\[([^\]\n[]{0,40})$/.exec(text.slice(0, caret));
+    setMention(m ? { id: b.id, start: caret - m[0].length, end: caret, q: m[1] } : null);
     if (b.type === 'text') {
       if (text === '---' || text === '***') { const i = listRef.current.findIndex((x) => x.id === b.id); change(b.id, { type: 'divider', content: {} }, true); insertAt(i, { type: 'text' }); return; }
       for (const [re, type, extra] of MD) {
@@ -196,6 +243,13 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
 
   function onKey(e: RKE<HTMLTextAreaElement>, b: PageBlock, i: number) {
     const el = e.currentTarget, text = el.value, s = el.selectionStart, en = el.selectionEnd, mod = e.metaKey || e.ctrlKey;
+    if (mention && mention.id === b.id) {
+      const total = mentionItems.length + 1;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setMentionSel((x) => Math.min(x + 1, total - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setMentionSel((x) => Math.max(x - 1, 0)); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); void pickMention(mentionItems[mentionSel] ?? 'new'); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setMention(null); return; }
+    }
     if (slashItems.length && b.id === focused) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSel((x) => Math.min(x + 1, slashItems.length - 1)); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setSlashSel((x) => Math.max(x - 1, 0)); return; }
@@ -242,6 +296,7 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
     setList([...listRef.current].sort((a, b) => a.position - b.position));
   }
 
+  const titleOf = useCallback((id: string) => pages.find((p) => p.id === id)?.title, [pages]);
   let num = 0;
   return (
     <div className="blocks">
@@ -258,8 +313,8 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
               {isText(b.type)
                 ? <TextBlock b={b} n={num} onOpenPage={onOpenPage}
                     register={(el) => { if (el) inputs.current.set(b.id, el); else inputs.current.delete(b.id); }}
-                    onChange={(t) => onTextChange(b, t)} onKeyDown={(e) => onKey(e, b, i)}
-                    onFocus={() => setFocused(b.id)} onBlur={() => { flush(); setTimeout(() => setFocused((f) => (f === b.id ? null : f)), 150); }}
+                    onChange={(t, c) => onTextChange(b, t, c)} onKeyDown={(e) => onKey(e, b, i)} titleOf={titleOf}
+                    onFocus={() => setFocused(b.id)} onBlur={() => { flush(); setTimeout(() => { setFocused((f) => (f === b.id ? null : f)); setMention((m) => (m?.id === b.id ? null : m)); }, 150); }}
                     onCheck={(c) => change(b.id, { content: { ...b.content, checked: c } }, true)} />
                 : <MediaBlock b={b} projectId={projectId} onChange={(patch) => change(b.id, patch, true)} onOpenPage={onOpenPage} />}
             </div>
@@ -267,6 +322,13 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
             {slashItems.length > 0 && focused === b.id && (
               <div className="block-menu" role="listbox" aria-label="Blocks">
                 {slashItems.map(([t, l, I], k) => <button type="button" key={t} role="option" aria-selected={k === slashSel} className={k === slashSel ? 'on' : ''} onMouseDown={(e) => { e.preventDefault(); choose(t, b.id); }}><I size={15} />{l}</button>)}
+              </div>
+            )}
+            {mention?.id === b.id && (
+              <div className="block-menu" role="listbox" aria-label="Link a page">
+                <span className="bm-cap">Link to page</span>
+                {mentionItems.map((p, k) => <button type="button" key={p.id} role="option" aria-selected={k === mentionSel} className={k === mentionSel ? 'on' : ''} onMouseDown={(e) => { e.preventDefault(); void pickMention(p); }}><FileText size={15} />{p.icon} {p.title}</button>)}
+                <button type="button" role="option" aria-selected={mentionSel === mentionItems.length} className={mentionSel === mentionItems.length ? 'on' : ''} onMouseDown={(e) => { e.preventDefault(); void pickMention('new'); }}><Plus size={15} />New page{mention.q.trim() ? ` “${mention.q.trim()}”` : ''}</button>
               </div>
             )}
             {menu?.at === i && <BlockMenu onPick={(t) => chooseInsert(t, i)} onClose={() => setMenu(null)} />}
@@ -298,8 +360,9 @@ function BlockMenu({ onPick, onClose }: { onPick: (t: BlockType) => void; onClos
 }
 
 /** Metin bloğu: düzenlerken textarea, değilken biçimli önizleme (biçim işareti varsa). */
-function TextBlock({ b, n, register, onChange, onKeyDown, onFocus, onBlur, onCheck, onOpenPage }: {
-  b: PageBlock; n: number; register: (el: HTMLTextAreaElement | null) => void; onChange: (t: string) => void;
+function TextBlock({ b, n, register, onChange, onKeyDown, onFocus, onBlur, onCheck, onOpenPage, titleOf }: {
+  titleOf?: (id: string) => string | undefined;
+  b: PageBlock; n: number; register: (el: HTMLTextAreaElement | null) => void; onChange: (t: string, caret: number) => void;
   onKeyDown: (e: RKE<HTMLTextAreaElement>) => void; onFocus: () => void; onBlur: () => void; onCheck: (c: boolean) => void; onOpenPage: (id: string) => void;
 }) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -310,10 +373,10 @@ function TextBlock({ b, n, register, onChange, onKeyDown, onFocus, onBlur, onChe
   const cls = `block-text ${['h1', 'h2', 'h3'].includes(b.type) ? b.type : ''} ${b.type === 'todo' && b.content.checked ? 'checked' : ''}`;
   const field = (
     <div className={`rt${preview ? ' rt-prev' : ''}`}>
-      {preview && <div className={cls} onClick={() => { ref.current?.focus(); }}>{renderInline(text, onOpenPage)}</div>}
+      {preview && <div className={cls} onClick={() => { ref.current?.focus(); }}>{renderInline(text, onOpenPage, titleOf)}</div>}
       <textarea ref={(el) => { ref.current = el; register(el); }} rows={1} className={cls} value={text} placeholder={PLACEHOLDER[b.type] ?? 'Type “/” for blocks…'}
         aria-label={PLACEHOLDER[b.type] ?? 'Text'} tabIndex={preview ? -1 : 0}
-        onChange={(e) => onChange(e.target.value)} onKeyDown={onKeyDown}
+        onChange={(e) => onChange(e.target.value, e.target.selectionStart)} onKeyDown={onKeyDown}
         onFocus={() => { setEditing(true); onFocus(); }} onBlur={() => { setEditing(false); onBlur(); }} />
     </div>
   );

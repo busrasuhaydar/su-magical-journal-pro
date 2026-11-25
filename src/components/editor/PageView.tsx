@@ -8,6 +8,7 @@ import type { Page } from '../../lib/types';
 import { ConfirmButton, useToast } from '../ui';
 import { BlockEditor, type PageLite } from './BlockEditor';
 import { HistoryButton } from './History';
+import { Backlinks } from './Backlinks';
 
 export const PAGE_ICONS = ['📄', '💡', '🔍', '🎨', '🗒️', '🛠️', '🏁', '📸', '✨', '📚', '🌸', '🔮'];
 
@@ -48,6 +49,7 @@ export function PageView({ page, pages, projectId, onOpenPage, onCreateChild, ac
         <div className="row" style={{ justifyContent: 'space-between' }}><b className="small">Subpages</b><button type="button" className="btn btn-glass btn-sm" onClick={onCreateChild}><Plus size={13} />Subpage</button></div>
         <div className="row" style={{ marginTop: 6 }}>{kids.map((k) => <button type="button" key={k.id} className="chip" style={{ cursor: 'pointer', padding: '6px 12px' }} onClick={() => onOpenPage(k.id)}>{k.icon} {k.title}</button>)}{!kids.length && <span className="small muted">None</span>}</div>
       </div>
+      <Backlinks pageId={page.id} />
     </section>
   );
 }

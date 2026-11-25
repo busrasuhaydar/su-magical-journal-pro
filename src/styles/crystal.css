@@ -1060,3 +1060,11 @@ html.zm .cb-turn-cast { display: none !important; }
 .inbox-acts { display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
 .inbox-item:not(:has(.inbox-thumb)) { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 720px) { .inbox-acts { grid-column: 2; } }
+
+/* ═══ Geri bağlantılar ═══ */
+.bm-cap { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-500); padding: 4px 10px 2px; }
+.backlinks { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
+.bl-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.bl-item { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 10px; border: 1px solid var(--glass-edge); background: rgba(255,255,255,.6); color: var(--ink-800, #3a1b33); text-decoration: none; font: inherit; font-size: 13px; cursor: pointer; max-width: 100%; }
+.bl-item small { color: var(--ink-500); font-size: 11.5px; }
+.bl-item:hover { background: rgba(255,226,240,.85); }
