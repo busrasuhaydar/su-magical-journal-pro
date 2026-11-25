@@ -41,6 +41,8 @@ import OpportunitiesPage from './pages/Opportunities';
 import CommonGallery from './pages/Gallery';
 import PagesPage from './pages/Pages';
 import InboxPage from './pages/Inbox';
+import ArtworksPage from './pages/Artworks';
+import { CertificatePage, PriceListPage } from './pages/Print';
 import { todayKey } from './lib/dates';
 
 function CrystalCanvas() {
@@ -57,6 +59,8 @@ function App() {
   return (
     <EditorProvider>
       <Routes>
+        <Route path="print/certificate/:id" element={<CertificatePage />} />
+        <Route path="print/price-list" element={<PriceListPage />} />
         <Route element={<Shell />}>
           <Route index element={<Home />} />
           <Route path="calendar" element={<Navigate to="/calendar/year" replace />} />
@@ -74,6 +78,7 @@ function App() {
           <Route path="collections/:slug" element={<NftCollectionsPage />} />
           <Route path="pages/:id?" element={<PagesPage />} />
           <Route path="inbox" element={<InboxPage />} />
+          <Route path="artworks/:id?" element={<ArtworksPage />} />
           <Route path="gallery" element={<CommonGallery />} />
           <Route path="files" element={<FilesPage />} />
           <Route path="settings" element={<SettingsPage />} />

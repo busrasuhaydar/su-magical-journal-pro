@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen, CalendarDays, CalendarHeart, CalendarPlus, CheckSquare, Files, FolderHeart, Gem, Home, Images, Landmark, Lightbulb, ListPlus,
-  LogOut, Megaphone, Pin, Plus, Search, Settings, Sparkles, Users, X, type LucideIcon, BellRing, NotebookPen, NotebookTabs, Inbox,
+  LogOut, Megaphone, Pin, Plus, Search, Settings, Sparkles, Users, X, type LucideIcon, BellRing, NotebookPen, NotebookTabs, Inbox, Frame,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getPref, setPref } from '../lib/prefs';
@@ -22,6 +22,7 @@ export const NAV: NavItem[] = [
   { to: '/tasks', match: '/tasks', label: 'Tasks', short: 'Tasks', Icon: CheckSquare, hint: 'All to-dos' },
   { to: '/projects', match: '/projects', label: 'My Projects', short: 'Projects', Icon: FolderHeart, hint: 'Exhibitions, collections' },
   { to: '/gallery', match: '/gallery', label: 'Gallery', short: 'Gallery', Icon: Images, hint: 'Shared gallery, NFT artworks' },
+  { to: '/artworks', match: '/artworks', label: 'Artworks', short: 'Artworks', Icon: Frame, hint: 'Inventory, certificates, price lists' },
   { to: '/collections', match: '/collections', label: 'My Collections', short: 'Collection', Icon: Gem, hint: '530 artworks' },
   { to: '/inbox', match: '/inbox', label: 'Inbox', short: 'Inbox', Icon: Inbox, hint: 'Shared & quick notes' },
   { to: '/pages', match: '/pages', label: 'Pages', short: 'Pages', Icon: NotebookTabs, hint: 'Free pages, notes' },
