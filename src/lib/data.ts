@@ -6,7 +6,11 @@ import { supabase, sha256, slugify } from './supabase';
 import { addDays, addMonths, toInstant, todayKey, type DayKey } from './dates';
 import type { CalEvent, CalendarEntry, FileRec, Holiday, JournalBlock, JournalDay, Profile, Project, ProjectProgress, Task } from './types';
 
-export const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 } } });
+export const queryClient = new QueryClient({ defaultOptions: {
+  // offlineFirst: çevrimdışıyken önbellekteki (IndexedDB) veri gösterilir; yazmalar her zaman çalışır (kuyruğa düşer)
+  queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1, networkMode: 'offlineFirst', gcTime: 7 * 24 * 3600_000 },
+  mutations: { networkMode: 'always' },
+} });
 
 async function run<T>(p: PromiseLike<{ data: T | null; error: unknown }>): Promise<T> {
   const { data, error } = await p;

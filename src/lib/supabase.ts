@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import { configureOffline, offlineFetch } from './offline';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string;
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 if (!url || !anon) throw new Error('Supabase settings are missing: .env must contain VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
 
-export const supabase = createClient(url, anon, { auth: { persistSession: true, autoRefreshToken: true } });
+export const supabase = createClient(url, anon, { auth: { persistSession: true, autoRefreshToken: true }, global: { fetch: offlineFetch } });
 
 /** Supabase hatasını kullanıcıya gösterilecek Türkçe mesaja çevirir. */
 export function errText(e: unknown): string {
@@ -44,3 +45,4 @@ export function keepaliveUpsert(table: string, rows: Record<string, unknown>[]) 
     });
   } catch { /* yok say */ }
 }
+configureOffline({ url, anon, token: () => accessToken });

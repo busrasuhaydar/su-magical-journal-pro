@@ -13,6 +13,7 @@ import { PageCorners } from '../crystal/PageCorners';
 import { useApplyBackground, useLookUrl } from '../crystal/look';
 import { NotificationBell } from './NotificationBell';
 import { QuickSearch } from './QuickSearch';
+import { OfflineBadge } from './OfflineBadge';
 
 function useNow() {
   const [now, setNow] = useState(() => new Date());
@@ -151,6 +152,7 @@ export function Shell() {
           <header className="cb-top">
             <Link to="/" className="cb-top-brand">Su's Magical Journal</Link>
             <div className="utilbar">
+              <OfflineBadge />
               <QuickSearch />
               <NotificationBell />
             </div>

@@ -1027,3 +1027,11 @@ html.zm .cb-turn-cast { display: none !important; }
 /* ═══ ⌘K içerik araması ═══ */
 .cmdk-snip { display: block; padding: 0 12px 8px 42px; margin-top: -4px; font-size: 12.5px; color: var(--ink-500); line-height: 1.45; overflow-wrap: anywhere; }
 .cmdk-snip mark { background: rgba(255,201,77,.45); color: inherit; border-radius: 3px; padding: 0 2px; }
+
+/* ═══ Çevrimdışı göstergesi ═══ */
+.off-badge { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,.9); cursor: pointer;
+  background: linear-gradient(135deg, rgba(255,236,246,.92), rgba(240,232,255,.9)); color: var(--rose-700, #8a1d5a); font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 10px rgba(160,40,110,.14); }
+.off-badge.sync { color: var(--teal-700, #0b6f6a); }
+.off-badge .spin { animation: offspin 1s linear infinite; }
+@keyframes offspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .off-badge .spin { animation: none; } }
