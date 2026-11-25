@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import { useAllPages, useContacts, useIdeas, useOpportunities, usePosts, useProjects, useTasks } from '../lib/data';
+import { pageHref, useAllPages, useContacts, useIdeas, useOpportunities, usePosts, useProjects, useTasks } from '../lib/data';
 import { dayKeyOf, formatRelative, todayKey } from '../lib/dates';
 import { useEditors } from './Editors';
 import { useNfts } from '../lib/nft';
@@ -41,10 +41,10 @@ function Palette({ onClose }: { onClose: () => void }) {
     { group: 'Quick actions', label: 'New content (social media)', icon: '✦', run: act(() => openPost({})) },
     { group: 'Quick actions', label: 'New event', icon: '◷', run: act(() => openEvent({})) },
     ...[['Home', '/'], ['Today', `/day/${todayKey()}`], ['Calendar', '/calendar/year'], ['Tasks', '/tasks'], ['My Projects', '/projects'], ['Social Media', '/social'],
-      ['Exhibitions & Opportunities', '/opportunities'], ['Contacts', '/contacts'], ['Ideas', '/ideas'], ['Shared Gallery', '/gallery'], ['My Collections', '/collections'], ['Files', '/files'], ['Settings', '/settings']]
+      ['Exhibitions & Opportunities', '/opportunities'], ['Contacts', '/contacts'], ['Pages', '/pages'], ['Ideas', '/ideas'], ['Shared Gallery', '/gallery'], ['My Collections', '/collections'], ['Files', '/files'], ['Settings', '/settings']]
       .map(([l, to]) => ({ group: 'Go', label: l, icon: '→', run: go(to) })),
     ...(projects.data ?? []).map((p) => ({ group: 'Projects', label: p.title, icon: p.icon ?? '✦', run: go(`/projects/${p.slug}`) })),
-    ...(pages.data ?? []).map((pg) => { const p = projects.data?.find((x) => x.id === pg.project_id); return { group: 'Pages', label: pg.title, hint: p?.title, icon: pg.icon ?? '📄', run: go(`/projects/${p?.slug}/pages/${pg.id}`) }; }),
+    ...(pages.data ?? []).filter((pg) => !pg.journal_day).map((pg) => { const p = projects.data?.find((x) => x.id === pg.project_id); return { group: 'Pages', label: pg.title, hint: p?.title ?? 'Pages', icon: pg.icon ?? '📄', run: go(pageHref(pg, projects.data)) }; }),
     ...(tasks.data ?? []).filter((t) => t.status !== 'cancelled').map((t) => { const d = t.starts_at ? dayKeyOf(t.starts_at) : t.due_date; return { group: 'Tasks', label: t.title, hint: [t.status === 'done' ? 'Completed' : '', d ? formatRelative(d) : ''].filter(Boolean).join(' · '), icon: t.status === 'done' ? '✓' : '○', run: act(() => openTask(t)) }; }),
     ...(posts.data ?? []).map((p) => ({ group: 'Content', label: p.title, hint: p.scheduled_at ? formatRelative(dayKeyOf(p.scheduled_at)) : undefined, icon: '✦', run: act(() => openPost(p)) })),
     ...(opps.data ?? []).map((o) => ({ group: 'Opportunities', label: o.title, hint: o.organization ?? undefined, icon: '🏛', run: go(`/opportunities/${o.id}`) })),

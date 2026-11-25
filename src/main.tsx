@@ -38,6 +38,7 @@ import NftCollectionsPage from './pages/NftCollections';
 import ProjectWorkspace from './pages/project/Workspace';
 import OpportunitiesPage from './pages/Opportunities';
 import CommonGallery from './pages/Gallery';
+import PagesPage from './pages/Pages';
 import { todayKey } from './lib/dates';
 
 function CrystalCanvas() {
@@ -69,6 +70,7 @@ function App() {
           <Route path="ideas" element={<IdeasPage />} />
           <Route path="collections" element={<NftCollectionsPage />} />
           <Route path="collections/:slug" element={<NftCollectionsPage />} />
+          <Route path="pages/:id?" element={<PagesPage />} />
           <Route path="gallery" element={<CommonGallery />} />
           <Route path="files" element={<FilesPage />} />
           <Route path="settings" element={<SettingsPage />} />
