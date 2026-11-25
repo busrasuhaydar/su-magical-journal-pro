@@ -6,6 +6,7 @@ import { ChevronLeft, Printer } from 'lucide-react';
 import { useProfile } from '../lib/data';
 import { money, useArtworks } from '../lib/artworks';
 import { ArtImage } from '../components/ArtImage';
+import { kitName, useKit } from '../lib/kit';
 
 const longDate = (d = new Date()) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Istanbul' });
 
@@ -86,6 +87,27 @@ export function PriceListPage() {
           </tbody>
         </table>
         <p className="plist-note">Prices include VAT where applicable. For enquiries please contact the artist.</p>
+      </article>
+    </PrintFrame>
+  );
+}
+
+/** Başvuru kiti metni: sade, yazdırılabilir sayfa. */
+export function KitPrintPage() {
+  const { id } = useParams();
+  const kit = useKit();
+  const profile = useProfile();
+  const k = kit.data?.find((x) => x.id === id);
+  if (kit.isLoading) return <div className="print-root"><p>Loading…</p></div>;
+  if (!k) return <div className="print-root"><p>Text not found. <Link to="/kit">Back</Link></p></div>;
+  const heading = { bio: k.lang === 'tr' ? 'Biyografi' : 'Biography', cv: 'CV', statement: k.lang === 'tr' ? 'Sanatçı Beyanı' : 'Artist Statement' }[k.kind];
+  return (
+    <PrintFrame back="/kit">
+      <article className="sheet kit-sheet" lang={k.lang}>
+        <p className="cert-kicker">{profile.data?.display_name || 'Su'}</p>
+        <h1 className="kit-h">{heading}</h1>
+        <p className="kit-meta no-print">{kitName(k)}</p>
+        <div className="kit-body">{k.body}</div>
       </article>
     </PrintFrame>
   );

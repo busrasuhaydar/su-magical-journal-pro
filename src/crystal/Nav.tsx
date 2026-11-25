@@ -5,7 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen, CalendarDays, CalendarHeart, CalendarPlus, CheckSquare, Files, FolderHeart, Gem, Home, Images, Landmark, Lightbulb, ListPlus,
-  LogOut, Megaphone, Pin, Plus, Search, Settings, Sparkles, Users, X, type LucideIcon, BellRing, NotebookPen, NotebookTabs, Inbox, Frame,
+  LogOut, Megaphone, Pin, Plus, Search, Settings, Sparkles, Users, X, type LucideIcon, BellRing, NotebookPen, NotebookTabs, Inbox, Frame, BriefcaseBusiness,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getPref, setPref } from '../lib/prefs';
@@ -28,6 +28,7 @@ export const NAV: NavItem[] = [
   { to: '/pages', match: '/pages', label: 'Pages', short: 'Pages', Icon: NotebookTabs, hint: 'Free pages, notes' },
   { to: '/ideas', match: '/ideas', label: 'Ideas & Notes', short: 'Notes', Icon: Lightbulb, hint: 'On My Mind' },
   { to: '/opportunities', match: '/opportunities', label: 'Exhibitions & Opportunities', short: 'Opportunities', Icon: Landmark, hint: 'Applications, dates' },
+  { to: '/kit', match: '/kit', label: 'Application Kit', short: 'Kit', Icon: BriefcaseBusiness, hint: 'Bio, CV, statement · TR/EN' },
   { to: '/social', match: '/social', label: 'Social Media', short: 'Social', Icon: Megaphone, hint: 'Posting plan' },
   { to: '/contacts', match: '/contacts', label: 'Contacts', short: 'Contacts', Icon: Users, hint: 'Galleries, curators' },
   { to: '/files', match: '/files', label: 'Files', short: 'Files', Icon: Files, hint: 'Documents, images' },

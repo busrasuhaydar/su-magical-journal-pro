@@ -2,7 +2,8 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, Bell, CalendarClock, CheckCircle2, ExternalLink, FileText, Link2, Plus, Sparkles, Upload, Wand2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Bell, BriefcaseBusiness, CalendarClock, CheckCircle2, Copy, ExternalLink, FileDown, FileText, Link2, Plus, Sparkles, Trash2, Upload, Wand2, X } from 'lucide-react';
+import { copyText, kitName, useKit, type KitItem } from '../lib/kit';
 import { PageHead } from '../components/Shell';
 import { TaskRow } from '../components/TaskRow';
 import { useEditors } from '../components/Editors';
@@ -351,13 +352,15 @@ function OpportunityDetail({ id }: { id: string }) {
             {docs.map((d, i) => (
               <div key={i} className="task-row" style={{ cursor: 'default', alignItems: 'center' }}>
                 <button type="button" className={`check${d.done ? ' on' : ''}`} onClick={() => upd({ required_docs: docs.map((x, j) => (j === i ? { ...x, done: !x.done } : x)) })} aria-label="Ready">{d.done && <CheckCircle2 size={14} />}</button>
-                <div className="t"><b style={{ textDecoration: d.done ? 'line-through' : undefined }}>{d.label}</b>{d.file_id && <span className="small muted"> · {files.data?.find((f) => f.id === d.file_id)?.title}</span>}</div>
+                <div className="t"><b style={{ textDecoration: d.done ? 'line-through' : undefined }}>{d.label}</b>{d.file_id && <span className="small muted"> · {files.data?.find((f) => f.id === d.file_id)?.title}</span>}
+                  {d.kit_id && <KitDocChip id={d.kit_id} onUnlink={() => upd({ required_docs: docs.map((x, j) => (j === i ? { ...x, kit_id: null } : x)) })} />}</div>
                 <MediaSources id={`od-doc-${i}`} size="xs" multiple={false} onFiles={(f) => attachDoc(f, i)} onPicked={(f) => attachDoc(f, i)} />
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => upd({ required_docs: docs.filter((_, j) => j !== i) })}>Remove</button>
+                <KitLinkButton label={d.label} onPick={(kid) => upd({ required_docs: docs.map((x, j) => (j === i ? { ...x, kit_id: kid, done: true } : x)) })} />
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => upd({ required_docs: docs.filter((_, j) => j !== i) })}><Trash2 size={13} />Remove</button>
               </div>
             ))}
             <form className="row" style={{ marginTop: 8 }} onSubmit={(e: FormEvent) => { e.preventDefault(); const inp = ((e.currentTarget as HTMLFormElement).elements.namedItem('nd') as HTMLInputElement); if (!inp.value.trim()) return; upd({ required_docs: [...docs, { label: inp.value.trim(), done: false } as RequiredDoc] }); inp.value = ''; }}>
-              <input id="od-newdoc" name="nd" className="input" style={{ flex: 1, width: 'auto' }} placeholder="Add document (e.g. Artist statement)" /><button className="btn btn-glass btn-sm">Add</button>
+              <input id="od-newdoc" name="nd" className="input" style={{ flex: 1, width: 'auto' }} placeholder="Add document (e.g. Artist statement)" /><button className="btn btn-glass btn-sm"><Plus size={13} />Add</button>
             </form>
           </section>
         </div>
@@ -440,5 +443,44 @@ function DetailsForm({ o, onSave }: { o: Opportunity; onSave: (r: Partial<Opport
       <Field label="Personal notes"><textarea id="df-notes" className="textarea" value={f.notes} onChange={s('notes')} /></Field>
       <span className="small muted">Saved automatically when you leave the field.</span>
     </section>
+  );
+}
+
+// ── Başvuru kiti bağlantısı ─────────────────────────────
+function KitLinkButton({ label, onPick }: { label: string; onPick: (id: string) => void }) {
+  const kit = useKit();
+  const [open, setOpen] = useState(false);
+  const l = label.toLocaleLowerCase('en');
+  const guess: KitItem['kind'] | null = /cv|resume|özgeçmiş/.test(l) ? 'cv' : /statement|beyan/.test(l) ? 'statement' : /bio/.test(l) ? 'bio' : null;
+  const items = (kit.data ?? []).filter((k) => k.body.trim()).sort((a, b) => Number(b.kind === guess) - Number(a.kind === guess));
+  return (
+    <>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)} title="Link a text from the Application Kit"><BriefcaseBusiness size={13} />Kit</button>
+      {open && (
+        <Dialog title={`Link from Application Kit · ${label}`} onClose={() => setOpen(false)}>
+          {items.length === 0 ? <p className="small muted">The kit is empty. <Link to="/kit">Write your bio, CV and statement</Link> first.</p> : (
+            <div className="task-list">{items.map((k) => (
+              <button type="button" key={k.id} className="task-row" style={{ textAlign: 'left', border: '1px solid var(--glass-edge)' }} onClick={() => { onPick(k.id); setOpen(false); }}>
+                <div className="t"><b>{kitName(k)}{k.kind === guess ? ' ✦' : ''}</b><div className="meta">{k.body.slice(0, 90)}…</div></div>
+              </button>
+            ))}</div>
+          )}
+        </Dialog>
+      )}
+    </>
+  );
+}
+function KitDocChip({ id, onUnlink }: { id: string; onUnlink: () => void }) {
+  const kit = useKit();
+  const toast = useToast();
+  const k = kit.data?.find((x) => x.id === id);
+  if (!k) return null;
+  return (
+    <span className="kit-chip">
+      <BriefcaseBusiness size={12} />{kitName(k)}
+      <button type="button" onClick={() => copyText(k.body).then(() => toast.ok('Copied ✦'), (x) => toast.fail(x))} aria-label="Copy text" title="Copy"><Copy size={12} /></button>
+      <Link to={`/print/kit/${k.id}`} aria-label="PDF" title="PDF"><FileDown size={12} /></Link>
+      <button type="button" onClick={onUnlink} aria-label="Unlink" title="Unlink"><X size={12} /></button>
+    </span>
   );
 }

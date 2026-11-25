@@ -51,7 +51,7 @@ function Palette({ onClose }: { onClose: () => void }) {
     { group: 'Quick actions', label: 'New content (social media)', icon: '✦', run: act(() => openPost({})) },
     { group: 'Quick actions', label: 'New event', icon: '◷', run: act(() => openEvent({})) },
     ...[['Home', '/'], ['Today', `/day/${todayKey()}`], ['Calendar', '/calendar/year'], ['Tasks', '/tasks'], ['My Projects', '/projects'], ['Social Media', '/social'],
-      ['Exhibitions & Opportunities', '/opportunities'], ['Contacts', '/contacts'], ['Inbox', '/inbox'], ['Pages', '/pages'], ['Artworks', '/artworks'], ['Ideas', '/ideas'], ['Shared Gallery', '/gallery'], ['My Collections', '/collections'], ['Files', '/files'], ['Settings', '/settings']]
+      ['Exhibitions & Opportunities', '/opportunities'], ['Contacts', '/contacts'], ['Inbox', '/inbox'], ['Pages', '/pages'], ['Artworks', '/artworks'], ['Application Kit', '/kit'], ['Ideas', '/ideas'], ['Shared Gallery', '/gallery'], ['My Collections', '/collections'], ['Files', '/files'], ['Settings', '/settings']]
       .map(([l, to]) => ({ group: 'Go', label: l, icon: '→', run: go(to) })),
     ...(projects.data ?? []).map((p) => ({ group: 'Projects', label: p.title, icon: p.icon ?? '✦', run: go(`/projects/${p.slug}`) })),
     ...(pages.data ?? []).filter((pg) => !pg.journal_day).map((pg) => { const p = projects.data?.find((x) => x.id === pg.project_id); return { group: 'Pages', label: pg.title, hint: p?.title ?? 'Pages', icon: pg.icon ?? '📄', run: go(pageHref(pg, projects.data)) }; }),

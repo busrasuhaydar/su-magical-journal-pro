@@ -42,7 +42,8 @@ import CommonGallery from './pages/Gallery';
 import PagesPage from './pages/Pages';
 import InboxPage from './pages/Inbox';
 import ArtworksPage from './pages/Artworks';
-import { CertificatePage, PriceListPage } from './pages/Print';
+import { CertificatePage, KitPrintPage, PriceListPage } from './pages/Print';
+import KitPage from './pages/Kit';
 import { todayKey } from './lib/dates';
 
 function CrystalCanvas() {
@@ -61,6 +62,7 @@ function App() {
       <Routes>
         <Route path="print/certificate/:id" element={<CertificatePage />} />
         <Route path="print/price-list" element={<PriceListPage />} />
+        <Route path="print/kit/:id" element={<KitPrintPage />} />
         <Route element={<Shell />}>
           <Route index element={<Home />} />
           <Route path="calendar" element={<Navigate to="/calendar/year" replace />} />
@@ -79,6 +81,7 @@ function App() {
           <Route path="pages/:id?" element={<PagesPage />} />
           <Route path="inbox" element={<InboxPage />} />
           <Route path="artworks/:id?" element={<ArtworksPage />} />
+          <Route path="kit" element={<KitPage />} />
           <Route path="gallery" element={<CommonGallery />} />
           <Route path="files" element={<FilesPage />} />
           <Route path="settings" element={<SettingsPage />} />

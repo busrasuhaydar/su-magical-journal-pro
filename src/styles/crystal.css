@@ -1167,3 +1167,14 @@ html.zm .cb-turn-cast { display: none !important; }
   .print-root { padding: 0; background: #fff; }
   .sheet { box-shadow: none; width: 210mm; }
 }
+
+/* ═══ Başvuru kiti ═══ */
+.kit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+.kit-card { display: grid; gap: 8px; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.42); border: 1px solid var(--glass-edge); }
+.kit-text { min-height: 150px; resize: vertical; }
+.kit-chip { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: rgba(214,240,238,.8); color: var(--teal-700, #0b6f6a); font-size: 12px; font-weight: 600; }
+.kit-chip button, .kit-chip a { display: inline-grid; place-items: center; border: 0; background: none; padding: 2px; cursor: pointer; color: inherit; }
+.kit-sheet .kit-h { font-size: clamp(26px, 5vw, 36px); color: #4a1d3d; margin: 6px 0 4px; text-align: left; }
+.kit-sheet .cert-kicker { text-align: left; }
+.kit-meta { font-family: var(--f-sans, system-ui); font-size: 12px; color: #9a8090; margin: 0 0 14px; }
+.kit-body { white-space: pre-wrap; font-size: 14.5px; line-height: 1.7; }

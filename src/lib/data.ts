@@ -60,6 +60,7 @@ const TABLE_KEYS: Record<string, string[][]> = {
   backups: [['backups']],
   inbox_items: [['inbox']],
   artworks: [['artworks']],
+  application_kit: [['kit']],
 };
 export function useRealtime(enabled: boolean) {
   const qc = useQueryClient();

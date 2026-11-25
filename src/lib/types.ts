@@ -91,7 +91,7 @@ export interface EntityLink { id: string; from_type: string; from_id: string; to
 export type OppStatus = 'to_review' | 'potential' | 'preparing' | 'submitted' | 'awaiting' | 'accepted' | 'rejected' | 'exhibiting' | 'completed' | 'withdrawn';
 export type OppKind = 'exhibition' | 'fair' | 'open_call' | 'competition' | 'residency' | 'gallery' | 'program' | 'event' | 'grant';
 export type OppDateKind = 'app_open' | 'deadline' | 'announcement' | 'delivery' | 'install' | 'opening' | 'closing';
-export interface RequiredDoc { label: string; done: boolean; file_id?: string | null }
+export interface RequiredDoc { label: string; done: boolean; file_id?: string | null; kit_id?: string | null }
 export interface Opportunity {
   id: string; title: string; kind: OppKind; organization: string | null; gallery: string | null; city: string | null; country: string | null;
   fee_amount: number | null; fee_currency: string | null; fee_note: string | null; requirements: string | null; artwork_requirements: string | null;
