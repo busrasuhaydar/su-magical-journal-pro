@@ -2,7 +2,9 @@
 // blok editörü, alt sayfalar ve geri bağlantılar. Proje sayfaları ve proje dışı sayfalar ortak kullanır.
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as RKE, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ImagePlus, ListTree, Plus, Redo2, Trash2, Undo2, X } from 'lucide-react';
+import { FileDown, ImagePlus, ListTree, Plus, Printer, Redo2, Trash2, Undo2, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { pageToMarkdown, download } from '../../lib/pageExport';
 import { supabase } from '../../lib/supabase';
 import { formatRelative, dayKeyOf } from '../../lib/dates';
 import { pageHref, useFiles, useProjects } from '../../lib/data';
@@ -66,6 +68,17 @@ export function PageView({ page, pages, projectId, onOpenPage, onCreateChild, ac
     to.push(ops); bump((x) => x + 1);
   }
   const stepRef = useRef(step); stepRef.current = step;
+  const navTo = useNavigate();
+  const allFiles = useFiles();
+  async function exportMd() {
+    try {
+      await apiRef.get(page.id)?.flush();
+      const { data, error } = await supabase.from('page_blocks').select('*').eq('page_id', page.id).order('position');
+      if (error) throw error;
+      const md = await pageToMarkdown(page.title, page.icon, data as PageBlock[], allFiles.data ?? [], (x) => pages.find((p) => p.id === x)?.title);
+      download(`${(page.title || 'page').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80)}.md`, md);
+    } catch (x) { toast.fail(x); }
+  }
   useEffect(() => {
     const h = (e: Event) => { if ((e as CustomEvent<string>).detail === page.id) void stepRef.current('undo'); };
     document.addEventListener('su:editor-undo', h);
@@ -103,6 +116,8 @@ export function PageView({ page, pages, projectId, onOpenPage, onCreateChild, ac
         <span>Last edited: {formatRelative(dayKeyOf(page.updated_at))}</span>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => step('undo')} disabled={!undo.current.length} title="Undo (⌘Z)" aria-label="Undo"><Undo2 size={13} /></button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => step('redo')} disabled={!redo.current.length} title="Redo (⇧⌘Z)" aria-label="Redo"><Redo2 size={13} /></button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => { void apiRef.get(page.id)?.flush(); navTo(`/print/page/${page.id}`); }} title="Print or save as PDF"><Printer size={13} />PDF</button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={exportMd} title="Download Markdown (.md)"><FileDown size={13} />Markdown</button>
         <FavButton item={ref} />
         {!cover && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCoverPick(true)}><ImagePlus size={13} />Cover</button>}
         {actions}

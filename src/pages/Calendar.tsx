@@ -142,7 +142,7 @@ function pillsFor(day: DayKey, data: CalData | undefined, hols: Holiday[], openT
     }
   }
   for (const x of data?.extras ?? []) {
-    if (x.day === day) out.push({ id: x.id, label: x.label, cls: `extra ${x.kind}`, sort: 2, onClick: x.href ? () => { window.location.assign(`${import.meta.env.BASE_URL}${x.href}`); } : undefined });
+    if (x.day === day) out.push({ id: x.id, label: x.label, cls: x.kind === 'ext' ? 'ext' : `extra ${x.kind}`, sort: 2, onClick: x.href ? () => { window.location.assign(`${import.meta.env.BASE_URL}${x.href}`); } : undefined });
   }
   for (const p of data?.posts ?? []) {
     if (p.scheduled_at && dayKeyOf(p.scheduled_at) === day)
@@ -217,7 +217,7 @@ function WeekView({ d }: { d: DayKey }) {
   const allDay = new Map(days.map((k) => [k, [
     ...(data.data?.events ?? []).filter((e) => e.all_day && dayKeyOf(e.starts_at) <= k && dayKeyOf(e.ends_at) >= k).map((e) => ({ label: e.title, cls: 'event', onClick: () => openEvent(e) })),
     ...(data.data?.tasks ?? []).filter((t) => !t.starts_at && t.due_date === k && t.status !== 'cancelled').map((t) => ({ label: t.title, cls: `task${t.status === 'done' ? ' done' : ''}`, onClick: () => openTask(t) })),
-    ...(data.data?.extras ?? []).filter((x) => x.day === k).map((x) => ({ label: x.label, cls: `extra ${x.kind}`, onClick: x.href ? () => { window.location.assign(`${import.meta.env.BASE_URL}${x.href}`); } : (() => {}) })),
+    ...(data.data?.extras ?? []).filter((x) => x.day === k && calShows(x.kind === 'ext' ? 'ext' : 'extra')).map((x) => ({ label: x.label, cls: x.kind === 'ext' ? 'ext' : `extra ${x.kind}`, onClick: x.href ? () => { window.location.assign(`${import.meta.env.BASE_URL}${x.href}`); } : (() => {}) })),
     ...(data.data?.posts ?? []).filter((p) => p.scheduled_at && dayKeyOf(p.scheduled_at) === k).map((p) => ({ label: `${hhmm(minutesOf(p.scheduled_at!))} ✦ ${p.title}`, cls: `post${p.status === 'published' ? ' done' : ''}`, onClick: () => openPost(p) })),
   ]]));
   return (

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, sha256, slugify } from './supabase';
-import { addDays, toInstant, todayKey, type DayKey } from './dates';
+import { addDays, dayKeyOf, hhmm, minutesOf, toInstant, todayKey, type DayKey } from './dates';
 import type { CalEvent, CalendarEntry, FileRec, Holiday, JournalBlock, JournalDay, Profile, Project, ProjectProgress, Task } from './types';
 
 export const queryClient = new QueryClient({ defaultOptions: {
@@ -59,6 +59,9 @@ const TABLE_KEYS: Record<string, string[][]> = {
   opportunity_dates: [['opps'], ['year'], ['cal']],
   project_opportunities: [['opps']],
   backups: [['backups']],
+  automations: [['automations']],
+  external_calendars: [['extcal']],
+  external_events: [['extcal'], ['cal']],
   inbox_items: [['inbox']],
   artworks: [['artworks']],
   application_kit: [['kit']],
@@ -103,7 +106,7 @@ export function useUpdateProfile() {
 
 // ── Calendar aralığı ─────────────────────────────────────
 export type CalOppDate = import('./types').OppDate & { opportunities: { title: string; status: import('./types').OppStatus } | null };
-export interface CalExtra { id: string; day: DayKey; label: string; kind: 'followup' | 'milestone' | 'project' | 'repeat'; href?: string }
+export interface CalExtra { id: string; day: DayKey; label: string; kind: 'followup' | 'milestone' | 'project' | 'repeat' | 'ext'; href?: string; color?: string }
 export interface CalData { tasks: Task[]; events: CalEvent[]; posts: import('./types').SocialPost[]; oppDates: CalOppDate[]; extras: CalExtra[] }
 /** Recurring görevin (ör. 15 günde bir) aralıktaki gelecek örnekleri. */
 function projectRepeats(t: Task, from: DayKey, to: DayKey): CalExtra[] {
@@ -115,7 +118,7 @@ export function useCalendarRange(from: DayKey, to: DayKey) {
     queryKey: ['cal', from, to],
     queryFn: async (): Promise<CalData> => {
       const start = toInstant(from, 0), end = toInstant(addDays(to, 1), 0);
-      const [timed, dated, events, posts, oppDates, contacts, stages, projs, repeating] = await Promise.all([
+      const [timed, dated, events, posts, oppDates, contacts, stages, projs, repeating, ext] = await Promise.all([
         run<Task[]>(supabase.from('tasks').select('*').is('deleted_at', null).lt('starts_at', end).gte('ends_at', start)),
         run<Task[]>(supabase.from('tasks').select('*').is('deleted_at', null).is('starts_at', null).gte('due_date', from).lte('due_date', to)),
         run<CalEvent[]>(supabase.from('events').select('*').is('deleted_at', null).lt('starts_at', end).gte('ends_at', start)),
@@ -125,12 +128,19 @@ export function useCalendarRange(from: DayKey, to: DayKey) {
         run<{ id: string; title: string; due_date: string; project_id: string; projects: { slug: string; title: string }[] | { slug: string; title: string } | null }[]>(supabase.from('project_stages').select('id,title,due_date,project_id,projects(slug,title)').is('deleted_at', null).gte('due_date', from).lte('due_date', to)),
         run<{ id: string; title: string; slug: string; target_date: string }[]>(supabase.from('projects').select('id,title,slug,target_date').is('deleted_at', null).neq('status', 'completed').gte('target_date', from).lte('target_date', to)),
         run<Task[]>(supabase.from('tasks').select('*').is('deleted_at', null).not('rrule', 'is', null).in('status', ['todo', 'doing']).not('due_date', 'is', null)),
+        supabase.from('external_events').select('id,title,starts_at,ends_at,all_day,external_calendars!inner(name,color,deleted_at)').is('external_calendars.deleted_at', null).lt('starts_at', end).gte('ends_at', start).limit(1000)
+          .then((r) => (r.error ? [] : (r.data ?? []) as unknown as { id: string; title: string; starts_at: string; ends_at: string; all_day: boolean; external_calendars: { name: string; color: string } | null }[])),
       ]);
       const extras: CalExtra[] = [
         ...contacts.map((c) => ({ id: `fu-${c.id}`, day: c.follow_up_date, label: `☺ Follow-up: ${c.name}`, kind: 'followup' as const, href: 'contacts' })),
         ...stages.map((x) => { const pr = Array.isArray(x.projects) ? x.projects[0] : x.projects; return { id: `st-${x.id}`, day: x.due_date, label: `◆ ${x.title}${pr ? ` · ${pr.title}` : ''}`, kind: 'milestone' as const, href: pr ? `projects/${pr.slug}` : undefined }; }),
         ...projs.map((x) => ({ id: `pj-${x.id}`, day: x.target_date, label: `⚑ Goal: ${x.title}`, kind: 'project' as const, href: `projects/${x.slug}` })),
         ...repeating.flatMap((t) => projectRepeats(t, from, to)),
+        ...ext.flatMap((x) => {
+          const out: CalExtra[] = []; let k = dayKeyOf(x.starts_at); const z = x.all_day ? addDays(dayKeyOf(x.ends_at), -1) : dayKeyOf(x.ends_at);
+          for (let i = 0; i < 31 && k <= (z < k ? k : z); i++) { if (k >= from && k <= to) out.push({ id: `ex-${x.id}-${k}`, day: k, label: `${x.all_day ? '' : hhmm(minutesOf(x.starts_at)) + ' '}${x.title}`, kind: 'ext', color: x.external_calendars?.color }); k = addDays(k, 1); }
+          return out;
+        }),
       ];
       return { tasks: [...timed, ...dated], events, posts, oppDates, extras };
     },

@@ -19,7 +19,7 @@ import { HAS_MARKUP, PAGE_TOKEN, renderInline } from './inline';
 import { BG_COLORS, BlockTools, EmbedBlock, FormatBubble, PasteChoice, PlusMenu, TEXT_COLORS, splitLines, type Fmt, type Preset } from './blockParts';
 import { parseDateText, type ParsedDate } from '../../lib/dateParse';
 import { toInstant } from '../../lib/dates';
-import { EXTRA_BLOCKS, ExtraBlock, extraSlash } from './extraBlocks';
+import { EXTRA_BLOCKS, ExtraBlock, extraSlash, type ExtraProps } from './extraBlocks';
 
 export type PageLite = Pick<Page, 'id' | 'title' | 'icon' | 'parent_id' | 'project_id'> & { journal_day?: string | null };
 export type Op = { before: PageBlock | null; after: PageBlock | null };
@@ -504,7 +504,7 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
 
   // Mobil: sağa kaydır = girinti, sola kaydır = girintiyi geri al
   const sw = useRef<{ x: number; y: number; id: string } | null>(null);
-  const touchStart = (e: RTE, id: string) => { sw.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id }; };
+  const touchStart = (e: RTE, id: string) => { if ((e.target as HTMLElement).closest('canvas, .draw-box')) return; sw.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, id }; };
   const touchEnd = (e: RTE) => {
     const s = sw.current; sw.current = null; if (!s || drag) return;
     const dx = e.changedTouches[0].clientX - s.x, dy = e.changedTouches[0].clientY - s.y;
@@ -539,7 +539,8 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
                 onSelect={(s, e) => setSelRange(s !== e ? { id: b.id, s, e } : null)}
                 onFocus={() => { setFocused(b.id); setActive(null); }} onBlur={() => { void flush(); setTimeout(() => { setFocused((f) => (f === b.id ? null : f)); setMention((m) => (m?.id === b.id ? null : m)); setSelRange((r) => (r?.id === b.id && document.activeElement !== inputs.current.get(b.id) ? null : r)); }, 180); }}
                 onCheck={(c) => change(b.id, { content: { ...b.content, checked: c } }, true)} />
-            : <MediaBlock b={b} projectId={projectId} onChange={(patch) => change(b.id, patch, true)} onOpenPage={onOpenPage} onPick={() => setPicker({ type: b.type === 'file' ? 'file' : 'image', id: b.id })} pageId={pageId} />}
+            : <MediaBlock b={b} projectId={projectId} onChange={(patch) => change(b.id, patch, true)} onOpenPage={onOpenPage} onPick={() => setPicker({ type: b.type === 'file' ? 'file' : 'image', id: b.id })} pageId={pageId}
+                insertBlocks={(bs) => { let at = i; bs.forEach((x) => { insertAt(at, { type: x.type, content: { text: x.text, ...(x.type === 'todo' ? { checked: !!x.checked } : {}), row: b.content.row, col: b.content.col } }, null); at++; }); }} />}
         </div>
         {selRange?.id === b.id && focused === b.id && !mention && <FormatBubble onFmt={format} />}
         {paste?.id === b.id && <PasteChoice url={paste.url} onPick={pasteAs} />}
@@ -623,7 +624,7 @@ function BlockRow({ b, dragging, drop, selecting, picked, onPick, gutter, del, c
   return (
     <div ref={dp.setNodeRef} id={`blk-${b.id}`} className={`block-row${dragging ? ' dragging' : ''}${drop ? ` drop-${drop}` : ''}${picked ? ' picked' : ''}`}
       onClickCapture={(e) => { if (selecting) { e.preventDefault(); e.stopPropagation(); onPick(); } }}
-      onTouchStart={(e) => { onTouchStart(e); if (!selecting && !(e.target as HTMLElement).closest('.grip, .bt-bar, button, input, a')) ls.onTouchStart?.(e); }} onTouchEnd={onTouchEnd}>
+      onTouchStart={(e) => { onTouchStart(e); if (!selecting && !(e.target as HTMLElement).closest('.grip, .bt-bar, button, input, a, canvas, iframe, .draw-box')) ls.onTouchStart?.(e); }} onTouchEnd={onTouchEnd}>
       <div className="block-gutter">
         {selecting ? <input type="checkbox" className="blk-check" checked={picked} readOnly aria-label="Select block" /> : <>
           {gutter}
@@ -674,7 +675,7 @@ function TextBlock({ b, n, register, onChange, onKeyDown, onFocus, onBlur, onChe
   }
 }
 
-function MediaBlock({ b, projectId, onChange, onOpenPage, onPick, pageId }: { b: PageBlock; projectId: string | null; onChange: (patch: Partial<PageBlock>) => void; onOpenPage: (id: string) => void; onPick: () => void; pageId: string }) {
+function MediaBlock({ b, projectId, onChange, onOpenPage, onPick, pageId, insertBlocks }: { b: PageBlock; projectId: string | null; onChange: (patch: Partial<PageBlock>) => void; onOpenPage: (id: string) => void; onPick: () => void; pageId: string; insertBlocks: ExtraProps['insertBlocks'] }) {
   const tasks = useTasks();
   const files = useFiles();
   void projectId;
@@ -693,7 +694,7 @@ function MediaBlock({ b, projectId, onChange, onOpenPage, onPick, pageId }: { b:
       return t ? <TaskRow task={t} /> : <p className="small muted">The task was deleted.</p>;
     }
     case 'page': return b.ref_page_id ? <button type="button" className="page-link" onClick={() => onOpenPage(b.ref_page_id!)}><FileText size={14} />{b.content.title ?? 'Page'}</button> : null;
-    default: return <ExtraBlock b={b} onChange={onChange} pageId={pageId} projectId={projectId} />;
+    default: return <ExtraBlock b={b} onChange={onChange} pageId={pageId} projectId={projectId} insertBlocks={insertBlocks} />;
   }
 }
 

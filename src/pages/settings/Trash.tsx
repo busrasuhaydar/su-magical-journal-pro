@@ -1,4 +1,4 @@
-// Çöp kutusu: deleted_at dolu her kayıt; geri getir veya kalıcı sil. 30 günden eskileri her gece kalıcı silinir.
+// Çöp kutusu: deleted_at dolu her kayıt; geri getir veya kalıcı sil. Silinenler kullanıcı silene kadar kalır.
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArchiveRestore, Trash2 } from 'lucide-react';
@@ -7,7 +7,6 @@ import { ConfirmButton, useToast } from '../../components/ui';
 
 type Row = { table_name: string; id: string; title: string; deleted_at: string };
 const LABEL: Record<string, string> = { tasks: 'Task', events: 'Event', projects: 'Project', journal_blocks: 'Journal item', files: 'File', social_posts: 'Post', contacts: 'Contact', ideas: 'Idea', notes: 'Note', project_stages: 'Stage', interactions: 'Interaction', pages: 'Page', opportunities: 'Opportunity', artworks: 'Artwork', application_kit: 'Application text', tags: 'Tag', inbox_items: 'Inbox item' };
-const daysLeft = (iso: string) => Math.max(0, 30 - Math.floor((Date.now() - Date.parse(iso)) / 864e5));
 
 export function TrashSettings() {
   const qc = useQueryClient();
@@ -32,13 +31,13 @@ export function TrashSettings() {
         <h2>Trash</h2>
         {kinds.length > 1 && <select id="trash-k" className="select" style={{ width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter"><option value="">All ({list.data?.length})</option>{kinds.map((k) => <option key={k} value={k}>{LABEL[k] ?? k}</option>)}</select>}
       </div>
-      <p className="small muted" style={{ margin: 0 }}>Deleted items wait here for 30 days, then they’re removed for good.</p>
+      <p className="small muted" style={{ margin: 0 }}>Deleted items stay here until you delete them.</p>
       {list.isLoading && <p className="small muted">Loading…</p>}
       {list.data?.length === 0 && <p className="small muted">The trash is empty.</p>}
       <div className="bk-list trash-list">
         {rows.slice(0, 200).map((r) => (
           <div key={r.table_name + r.id} className="bk-row">
-            <div className="bk-main"><b>{r.title}</b><span className="small muted">{LABEL[r.table_name] ?? r.table_name} · {daysLeft(r.deleted_at)} days left</span></div>
+            <div className="bk-main"><b>{r.title}</b><span className="small muted">{LABEL[r.table_name] ?? r.table_name} · deleted {new Date(r.deleted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span></div>
             <div className="row" style={{ gap: 6 }}>
               <button type="button" className="btn btn-glass btn-sm" onClick={() => restore(r)}><ArchiveRestore size={13} />Restore</button>
               <ConfirmButton className="btn btn-ghost btn-sm" label={<><Trash2 size={13} />Delete forever</>} confirmText="Delete forever?" onConfirm={() => purge(r)} />

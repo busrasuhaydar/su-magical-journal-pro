@@ -45,6 +45,7 @@ import ArtworksPage from './pages/Artworks';
 import { CertificatePage, KitPrintPage, PriceListPage } from './pages/Print';
 import KitPage from './pages/Kit';
 import TagsPage from './pages/Tags';
+import PagePrint from './pages/PagePrint';
 import { todayKey } from './lib/dates';
 import { CAL } from './lib/defs';
 function CalendarDefault() { return <Navigate to={`/calendar/${CAL.view}`} replace />; }
@@ -66,6 +67,7 @@ function App() {
         <Route path="print/certificate/:id" element={<CertificatePage />} />
         <Route path="print/price-list" element={<PriceListPage />} />
         <Route path="print/kit/:id" element={<KitPrintPage />} />
+        <Route path="print/page/:id" element={<PagePrint />} />
         <Route element={<Shell />}>
           <Route index element={<Home />} />
           <Route path="calendar" element={<CalendarDefault />} />
