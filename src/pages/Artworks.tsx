@@ -8,6 +8,7 @@ import { ConfirmButton, Dialog, Empty, Field, useToast } from '../components/ui'
 import { MediaPickerDialog } from '../components/Media';
 import { ArtImage } from '../components/ArtImage';
 import { FavButton } from '../components/FavButton';
+import { TagList, TagPicker } from '../components/TagPicker';
 import { useContacts, useProjects } from '../lib/data';
 import { useTrackRecent } from '../lib/ui';
 import { artKey, useNfts } from '../lib/nft';
@@ -74,6 +75,7 @@ function ArtworkList() {
               <div className="art-meta">
                 <Link to={`/artworks/${a.id}`} className="art-t">{a.title}</Link>
                 <span className="small muted">{[a.year, a.technique].filter(Boolean).join(' · ') || '—'}</span>
+                <TagList type="artwork" id={a.id} />
                 <div className="row" style={{ gap: 6, justifyContent: 'space-between' }}>
                   <span className="art-st" style={{ '--c': ART_STATUS_COLOR[a.status] } as React.CSSProperties}>{ART_STATUS_SHORT[a.status]}</span>
                   <b className="small">{money(a.price, a.currency)}</b>
@@ -155,6 +157,7 @@ function ArtworkDetail({ id }: { id: string }) {
         </section>
         <section className="glass panel art-form">
           <Field label="Title"><input id="aw-title" className="input" value={f.title ?? ''} onChange={(e) => set({ title: e.target.value })} /></Field>
+          <div className="field"><span>Tags</span><TagPicker type="artwork" id={a.id} /></div>
           <div className="grid-2">
             <Field label="Year"><input id="aw-year" className="input" type="number" inputMode="numeric" value={f.year ?? ''} onChange={(e) => set({ year: e.target.value ? Number(e.target.value) : null })} /></Field>
             <Field label="Technique"><input id="aw-tech" className="input" value={f.technique ?? ''} onChange={(e) => set({ technique: e.target.value })} placeholder="Oil on canvas, digital, bronze…" /></Field>

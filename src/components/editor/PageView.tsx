@@ -14,6 +14,7 @@ import { FavButton } from '../FavButton';
 import { apiRef, BlockEditor, type Op, type PageLite } from './BlockEditor';
 import { HistoryButton } from './History';
 import { Backlinks } from './Backlinks';
+import { TagPicker } from '../TagPicker';
 
 export const PAGE_ICONS = ['📄', '💡', '🔍', '🎨', '🗒️', '🛠️', '🏁', '📸', '✨', '📚', '🌸', '🔮'];
 
@@ -103,6 +104,7 @@ export function PageView({ page, pages, projectId, onOpenPage, onCreateChild, ac
         <ConfirmButton label={<><Trash2 size={13} />Delete page</>} className="btn btn-ghost btn-sm" confirmText="Move the page and its subpages to trash?"
           onConfirm={async () => { const { error } = await supabase.from('pages').update({ deleted_at: new Date().toISOString() }).eq('id', page.id); if (error) toast.fail(error); else { qc.invalidateQueries({ queryKey: ['pages'] }); onOpenPage(page.parent_id); } }} />
       </div>
+      <TagPicker type="page" id={page.id} />
       {heads.length >= 2 && (
         <details className="toc" open>
           <summary><ListTree size={14} /> Contents</summary>

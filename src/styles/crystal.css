@@ -1178,3 +1178,20 @@ html.zm .cb-turn-cast { display: none !important; }
 .kit-sheet .cert-kicker { text-align: left; }
 .kit-meta { font-family: var(--f-sans, system-ui); font-size: 12px; color: #9a8090; margin: 0 0 14px; }
 .kit-body { white-space: pre-wrap; font-size: 14.5px; line-height: 1.7; }
+
+/* ═══ Etiketler ═══ */
+.tag-picker, .tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 2px 0 8px; position: relative; }
+.tag-row { margin: 2px 0; }
+.tag-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.5;
+  color: var(--c); background: color-mix(in srgb, var(--c) 13%, rgba(255,255,255,.85)); border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); }
+.tag-chip a { color: inherit; text-decoration: none; }
+.tag-chip button { border: 0; background: none; padding: 0; display: inline-grid; place-items: center; color: inherit; cursor: pointer; opacity: .7; }
+.tag-chip.big { padding: 6px 12px; font-size: 14px; text-decoration: none; gap: 8px; }
+.tag-chip.big small { font-weight: 600; opacity: .7; }
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-addbtn { display: inline-flex; align-items: center; gap: 3px; border: 1px dashed var(--line-strong); background: transparent; border-radius: 999px; padding: 2px 9px; font: inherit; font-size: 12px; color: var(--ink-500); cursor: pointer; }
+.tag-add { position: relative; display: inline-flex; align-items: center; gap: 3px; border: 1px solid var(--rose-300); background: #fff; border-radius: 999px; padding: 1px 8px; color: var(--rose-500); }
+.tag-add input { border: 0; outline: 0; background: none; font: inherit; font-size: 12.5px; width: 110px; color: var(--ink-900); }
+.tag-sugg { position: absolute; left: 0; top: calc(100% + 4px); z-index: 30; min-width: 180px; display: grid; padding: 4px; border-radius: 12px; background: rgba(255,250,252,.98); border: 1px solid #fff; box-shadow: var(--shadow-pop); }
+.tag-sugg button { display: flex; align-items: center; gap: 6px; border: 0; background: none; text-align: left; padding: 6px 8px; border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer; color: var(--ink-800, #3a1b33); }
+.tag-sugg button:hover { background: rgba(255,214,236,.7); }

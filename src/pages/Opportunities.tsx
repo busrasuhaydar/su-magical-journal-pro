@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Bell, BriefcaseBusiness, CalendarClock, CheckCircle2, Copy, ExternalLink, FileDown, FileText, Link2, Plus, Sparkles, Trash2, Upload, Wand2, X } from 'lucide-react';
 import { copyText, kitName, useKit, type KitItem } from '../lib/kit';
+import { TagPicker } from '../components/TagPicker';
 import { PageHead } from '../components/Shell';
 import { TaskRow } from '../components/TaskRow';
 import { useEditors } from '../components/Editors';
@@ -308,10 +309,11 @@ function OpportunityDetail({ id }: { id: string }) {
     <>
       <PageHead title={o.title}>
         <Link className="btn btn-glass btn-sm" to="/opportunities"><ArrowLeft size={14} />All opportunities</Link>
-        <select id="od-status" className="select" style={{ width: 'auto', borderColor: OPP_STATUS_COLOR[o.status], fontWeight: 600 }} value={o.status} onChange={(e) => upd({ status: e.target.value as OppStatus })}>
+ <select id="od-status" className="select" style={{ width: 'auto', borderColor: OPP_STATUS_COLOR[o.status], fontWeight: 600 }} value={o.status} onChange={(e) => upd({ status: e.target.value as OppStatus })}>
           {PIPE.map((s) => <option key={s} value={s}>{OPP_STATUS_LABEL[s]}</option>)}
         </select>
       </PageHead>
+      <TagPicker type="opportunity" id={o.id} />
       {o.extraction && Array.isArray((o.extraction as { warnings?: string[] }).warnings) && (o.extraction as { warnings: string[] }).warnings.length > 0 && (
         <div className="warn-box"><b className="row" style={{ gap: 6 }}><AlertTriangle size={15} />The announcement has unclear information</b><ul>{(o.extraction as { warnings: string[] }).warnings.map((w, i) => <li key={i}>{w}</li>)}</ul></div>
       )}

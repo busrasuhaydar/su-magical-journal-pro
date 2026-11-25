@@ -61,6 +61,8 @@ const TABLE_KEYS: Record<string, string[][]> = {
   inbox_items: [['inbox']],
   artworks: [['artworks']],
   application_kit: [['kit']],
+  tags: [['tags']],
+  tag_links: [['tags']],
 };
 export function useRealtime(enabled: boolean) {
   const qc = useQueryClient();

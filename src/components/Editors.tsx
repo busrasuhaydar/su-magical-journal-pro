@@ -4,6 +4,7 @@ import { useProjects, useSaveEvent, useSaveTask, useSoftDelete, useCompleteTask,
 import { dayKeyOf, hhmm, minutesOf, parseHHMM, toInstant, todayKey, type DayKey } from '../lib/dates';
 import { REMINDER_OPTIONS, EVENT_KIND_LABEL, PRIORITY_LABEL, RRULE_LABEL, STATUS_LABEL, TASK_CATEGORIES, type CalEvent, type EventKind, type Priority, type Task, type TaskStatus } from '../lib/types';
 import { ConfirmButton, Dialog, Field, useToast } from './ui';
+import { TagPicker } from './TagPicker';
 import { getPref } from '../lib/prefs';
 import { PostEditor } from './PostEditor';
 import type { SocialPost } from '../lib/types';
@@ -75,6 +76,7 @@ function TaskEditor({ draft, onClose }: { draft: TaskDraft; onClose: () => void 
       <form onSubmit={submit} className="task-form" style={{ display: 'grid', gap: 12 }}>
         <Field label="Title"><input id="t-title" className="input" value={f.title} onChange={set('title')} placeholder="e.g. Prepare artwork for SU'RÉAL CITY" /></Field>
         <Field label="Description"><textarea id="t-desc" className="textarea" value={f.description} onChange={set('description')} /></Field>
+        {draft.id && <div className="field"><span>Tags</span><TagPicker type="task" id={draft.id} /></div>}
         <div className="grid-3">
           <Field label="Date"><input id="t-day" type="date" className="input" value={f.day} onChange={set('day')} /></Field>
           <Field label="Start"><input id="t-start" type="time" step={900} className="input" value={f.start} onChange={set('start')} /></Field>

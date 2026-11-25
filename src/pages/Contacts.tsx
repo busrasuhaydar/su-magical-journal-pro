@@ -1,7 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { Plus, Mail, Globe, Phone, CalendarClock } from 'lucide-react';
+import { Plus, Mail, Globe, Phone, CalendarClock, Pencil } from 'lucide-react';
 import { PageHead } from '../components/Shell';
 import { ConfirmButton, Dialog, Empty, Field, useToast } from '../components/ui';
+import { TagPicker } from '../components/TagPicker';
 import { useContacts, useInteractions, useProjectContacts, useProjects, useRowMutation, useSaveContact, useSaveInteraction, useSaveTask, useSoftDelete } from '../lib/data';
 import { dayKeyOf, formatRelative, formatShort, hhmm, minutesOf, parseHHMM, toInstant, todayKey, addDays } from '../lib/dates';
 import { CONTACT_CATEGORY_LABEL, INTERACTION_LABEL, type Contact, type ContactCategory, type InteractionKind } from '../lib/types';
@@ -74,7 +75,8 @@ function ContactDetail({ c, onEdit }: { c: Contact; onEdit: () => void }) {
   const linked = (pcs.data ?? []).filter((p) => p.contact_id === c.id);
   return (
     <section className="glass panel" style={{ display: 'grid', gap: 14 }}>
-      <div className="panel-head" style={{ marginBottom: 0 }}><div><h2>{c.name}</h2><span className="small muted">{CONTACT_CATEGORY_LABEL[c.category]}{c.organization ? ` · ${c.organization}` : ''}</span></div><button type="button" className="btn btn-glass btn-sm" onClick={onEdit}>Edit</button></div>
+      <div className="panel-head" style={{ marginBottom: 0 }}><div><h2>{c.name}</h2><span className="small muted">{CONTACT_CATEGORY_LABEL[c.category]}{c.organization ? ` · ${c.organization}` : ''}</span></div><button type="button" className="btn btn-glass btn-sm" onClick={onEdit}><Pencil size={13} />Edit</button></div>
+      <TagPicker type="contact" id={c.id} />
       <div className="row small" style={{ gap: 14 }}>
         {c.email && <span className="row" style={{ gap: 4 }}><Mail size={13} /><span style={{ userSelect: 'all' }}>{c.email}</span></span>}
         {c.phone && <span className="row" style={{ gap: 4 }}><Phone size={13} /><span style={{ userSelect: 'all' }}>{c.phone}</span></span>}

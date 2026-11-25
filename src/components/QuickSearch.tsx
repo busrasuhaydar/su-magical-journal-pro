@@ -9,6 +9,7 @@ import { dayKeyOf, formatRelative, todayKey } from '../lib/dates';
 import { useEditors } from './Editors';
 import { artKey, useNfts } from '../lib/nft';
 import { ART_STATUS_SHORT, money, useArtworks } from '../lib/artworks';
+import { TAG_ENTITY_LABEL, useTagLinks, useTags } from '../lib/tags';
 
 type Item = { group: string; label: string; hint?: string; icon: string; run: () => void; snippet?: string };
 type Hit = { kind: 'page' | 'journal' | 'note' | 'idea'; id: string; parent_id: string | null; title: string; snippet: string };
@@ -39,6 +40,7 @@ function Palette({ onClose }: { onClose: () => void }) {
   const projects = useProjects(), pages = useAllPages(), tasks = useTasks(), posts = usePosts(), contacts = useContacts(), opps = useOpportunities(), ideas = useIdeas();
   const nfts = useNfts();
   const arts = useArtworks();
+  const tags = useTags(), tagLinks = useTagLinks();
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -81,12 +83,34 @@ function Palette({ onClose }: { onClose: () => void }) {
     return { group: 'In content', label, hint: { page: 'Page', journal: 'Journal', note: 'Note', idea: 'Idea' }[h.kind], icon: { page: '📄', journal: '📔', note: '🗒️', idea: '💡' }[h.kind], snippet: h.snippet, run: go(to) };
   }), [hits.data, pages.data, projects.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // #etiket: etiketler ve o etiketli kayıtlar
+  const tagResults = useMemo((): Item[] | null => {
+    const m = /^#(.*)$/.exec(q.trim()); if (!m) return null;
+    const n = norm(m[1]);
+    const hit = (tags.data ?? []).filter((t) => norm(t.name).includes(n));
+    const out: Item[] = hit.map((t) => ({ group: 'Tags', label: `#${t.name}`, hint: `${(tagLinks.data ?? []).filter((l) => l.tag_id === t.id).length} items`, icon: '#', run: go(`/tags/${t.id}`) }));
+    const exact = hit.filter((t) => !n || norm(t.name) === n || hit.length === 1);
+    for (const t of exact) for (const l of (tagLinks.data ?? []).filter((x) => x.tag_id === t.id)) {
+      const label = l.entity_type === 'task' ? tasks.data?.find((x) => x.id === l.entity_id)?.title
+        : l.entity_type === 'page' ? pages.data?.find((x) => x.id === l.entity_id)?.title
+        : l.entity_type === 'artwork' ? arts.data?.find((x) => x.id === l.entity_id)?.title
+        : l.entity_type === 'contact' ? contacts.data?.find((x) => x.id === l.entity_id)?.name
+        : l.entity_type === 'opportunity' ? opps.data?.find((x) => x.id === l.entity_id)?.title
+        : ideas.data?.find((x) => x.id === l.entity_id)?.title;
+      if (!label) continue;
+      const it = all.find((a) => a.label === label && a.group.toLowerCase().startsWith(l.entity_type === 'opportunity' ? 'opport' : TAG_ENTITY_LABEL[l.entity_type].toLowerCase().slice(0, 4)));
+      out.push({ group: `#${t.name}`, label, hint: TAG_ENTITY_LABEL[l.entity_type], icon: it?.icon ?? '•', run: it?.run ?? go(`/tags/${t.id}`) });
+    }
+    return out;
+  }, [q, tags.data, tagLinks.data, all]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const results = useMemo(() => {
+    if (tagResults) return tagResults.slice(0, 60);
     const n = norm(q.trim());
     if (!n) return all.filter((i) => i.group === 'Quick actions' || i.group === 'Go' || i.group === 'Projects').slice(0, 30);
     const titles = all.filter((i) => norm(`${i.label} ${i.hint ?? ''}`).includes(n)).sort((a, b) => Number(!norm(a.label).startsWith(n)) - Number(!norm(b.label).startsWith(n))).slice(0, 40);
     return [...titles, ...contentItems];
-  }, [q, all, contentItems]);
+  }, [q, all, contentItems, tagResults]);
   useEffect(() => setSel(0), [q]);
 
   const key = (e: React.KeyboardEvent) => {
@@ -99,7 +123,7 @@ function Palette({ onClose }: { onClose: () => void }) {
   return (
     <div className="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="cmdk" role="dialog" aria-label="Quick search">
-        <input ref={input} id="cmdk-q" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={key} placeholder="Search: project, task, content, contact, page…" autoComplete="off" />
+        <input ref={input} id="cmdk-q" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={key} placeholder="Search everything · #tag for tags" autoComplete="off" />
         <div className="cmdk-list">
           {results.length === 0 && <p className="small muted" style={{ padding: 12 }}>{hits.isFetching ? 'Searching…' : 'No results.'}</p>}
           {results.map((r, i) => {

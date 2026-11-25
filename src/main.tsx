@@ -44,6 +44,7 @@ import InboxPage from './pages/Inbox';
 import ArtworksPage from './pages/Artworks';
 import { CertificatePage, KitPrintPage, PriceListPage } from './pages/Print';
 import KitPage from './pages/Kit';
+import TagsPage from './pages/Tags';
 import { todayKey } from './lib/dates';
 
 function CrystalCanvas() {
@@ -82,6 +83,7 @@ function App() {
           <Route path="inbox" element={<InboxPage />} />
           <Route path="artworks/:id?" element={<ArtworksPage />} />
           <Route path="kit" element={<KitPage />} />
+          <Route path="tags/:id?" element={<TagsPage />} />
           <Route path="gallery" element={<CommonGallery />} />
           <Route path="files" element={<FilesPage />} />
           <Route path="settings" element={<SettingsPage />} />
