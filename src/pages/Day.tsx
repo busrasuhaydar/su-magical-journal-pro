@@ -6,10 +6,11 @@ import { PageHead } from '../components/Shell';
 import { useEditors } from '../components/Editors';
 import { TimeGrid, movedTimes } from '../components/TimeGrid';
 import { TaskRow } from '../components/TaskRow';
-import { ConfirmButton, Empty, Field, formatBytes, useToast } from '../components/ui';
+import { ConfirmButton, Field, formatBytes, useToast } from '../components/ui';
 import { MediaSources } from '../components/Media';
 import { gridItems, useGridHandlers } from './Calendar';
-import { ensureJournalDay, linkFile, uploadFile, useCalendarRange, useFiles, useHolidays, useJournal, useOverdue, useSignedUrl, useSoftDelete } from '../lib/data';
+import { ensureJournalDay, ensureJournalPage, linkFile, pageHref, uploadFile, useAllPages, useCalendarRange, useFiles, useHolidays, useJournal, useJournalPage, useOverdue, useProjects, useSignedUrl, useSoftDelete } from '../lib/data';
+import { BlockEditor } from '../components/editor/BlockEditor';
 import { addDays, formatLong, isValidKey, todayKey, type DayKey } from '../lib/dates';
 import { supabase } from '../lib/supabase';
 import { countryName, flag } from '../lib/countries';
@@ -119,9 +120,6 @@ function JournalPanel({ day }: { day: DayKey }) {
   const files = useFiles();
   const delBlock = useSoftDelete('journal_blocks');
   const [goal, setGoal] = useState('');
-  const [note, setNote] = useState('');
-  const [link, setLink] = useState({ title: '', url: '' });
-  const [adding, setAdding] = useState<'' | 'note' | 'link'>('');
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -187,10 +185,10 @@ function JournalPanel({ day }: { day: DayKey }) {
         <input id="goal" className="goal" value={goal} onChange={(e) => setGoal(e.target.value)} onBlur={saveGoal} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} placeholder="What do you want to achieve today?" />
       </Field>
 
+      <JournalEditor day={day} />
       <div className="journal-blocks" style={{ marginTop: 16 }}>
         {images.length > 0 && <Gallery items={images} fileMap={fileMap} onResize={(b) => updateBlock(b.id, { size: b.size === 's' ? 'm' : b.size === 'm' ? 'l' : 's' })} onDelete={(b) => delBlock.mutate(b.id)} onReorder={reorder} />}
         {others.map((b) => <BlockCard key={b.id} b={b} file={b.file_id ? fileMap.get(b.file_id) : undefined} onDelete={() => delBlock.mutate(b.id)} />)}
-        {blocks.length === 0 && !j.isLoading && <Empty title="A blank page">Add a photo, voice recording, document, note or link.</Empty>}
       </div>
 
       <div className={`dropzone${over ? ' over' : ''}`} style={{ marginTop: 14 }} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={drop}>
@@ -199,32 +197,28 @@ function JournalPanel({ day }: { day: DayKey }) {
         <div className="small" style={{ marginTop: 4 }}>Photo, video, audio, PDF, document · the same file isn’t uploaded twice</div>
       </div>
 
-      <div className="row" style={{ marginTop: 12 }}>
-        <button type="button" className="btn btn-glass btn-sm" onClick={() => setAdding(adding === 'note' ? '' : 'note')}><StickyNote size={14} />Note</button>
-        <button type="button" className="btn btn-glass btn-sm" onClick={() => setAdding(adding === 'link' ? '' : 'link')}><Link2 size={14} />Link card</button>
-      </div>
-      {adding === 'note' && (
-        <form style={{ display: 'grid', gap: 8, marginTop: 10 }} onSubmit={async (e) => { e.preventDefault(); if (!note.trim()) return; try { await addBlock({ kind: 'note', body: note.trim() }); setNote(''); setAdding(''); } catch (x) { toast.fail(x); } }}>
-          <textarea id="j-note" className="textarea" value={note} onChange={(e) => setNote(e.target.value)} placeholder="What’s on your mind today…" />
-          <div className="row"><button className="btn btn-primary btn-sm">Add note</button></div>
-        </form>
-      )}
-      {adding === 'link' && (
-        <form style={{ display: 'grid', gap: 8, marginTop: 10 }} onSubmit={async (e) => {
-          e.preventDefault();
-          let url = link.url.trim(); if (!url) return;
-          if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-          try { new URL(url); } catch { return toast.fail(new Error('Enter a valid web address.')); }
-          try { await addBlock({ kind: 'link', url, title: link.title.trim() || new URL(url).hostname }); setLink({ title: '', url: '' }); setAdding(''); } catch (x) { toast.fail(x); }
-        }}>
-          <div className="grid-2">
-            <Field label="Ad"><input id="j-ltitle" className="input" value={link.title} onChange={(e) => setLink((s) => ({ ...s, title: e.target.value }))} placeholder="e.g. Istanbul Art Fair" /></Field>
-            <Field label="Address"><input id="j-lurl" className="input" value={link.url} onChange={(e) => setLink((s) => ({ ...s, url: e.target.value }))} placeholder="https://…" /></Field>
-          </div>
-          <div className="row"><button className="btn btn-primary btn-sm">Add card</button></div>
-        </form>
-      )}
     </section>
+  );
+}
+
+/** Günlük yazısı: o güne ait sayfa, ortak blok editörüyle. Eski journal_blocks kayıtları aşağıda kart olarak kalır. */
+function JournalEditor({ day }: { day: DayKey }) {
+  const page = useJournalPage(day);
+  const pages = useAllPages();
+  const projects = useProjects();
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [fresh, setFresh] = useState(false);
+  async function start() {
+    try { await ensureJournalPage(day, formatLong(day)); setFresh(true); qc.invalidateQueries({ queryKey: ['pages'] }); } catch (x) { toast.fail(x); }
+  }
+  const open = (id: string | null) => id && nav(pageHref(pages.data?.find((x) => x.id === id), projects.data));
+  return (
+    <div className="journal-editor">
+      {page.data ? <BlockEditor key={page.data.id} pageId={page.data.id} projectId={null} pages={pages.data ?? []} onOpenPage={open} autoStart={fresh} />
+        : !page.isLoading && <button type="button" className="block-empty" onClick={start}><StickyNote size={14} /> What’s on your mind today… click to start writing (type “/” for blocks)</button>}
+    </div>
   );
 }
 

@@ -29,3 +29,18 @@ export function slugify(s: string) {
   const map: Record<string, string> = { ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', é: 'e', â: 'a', î: 'i', û: 'u' };
   return s.toLocaleLowerCase('en').replace(/[çğıöşüéâîû]/g, (c) => map[c] ?? c).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
 }
+
+// Sayfa kapanırken kaydetme: tarayıcı isteği kesmesin diye keepalive fetch ile doğrudan REST'e yazar.
+let accessToken: string | null = null;
+supabase.auth.getSession().then(({ data }) => { accessToken = data.session?.access_token ?? null; });
+supabase.auth.onAuthStateChange((_e, s) => { accessToken = s?.access_token ?? null; });
+export function keepaliveUpsert(table: string, rows: Record<string, unknown>[]) {
+  if (!rows.length || !accessToken) return;
+  try {
+    void fetch(`${url}/rest/v1/${table}?on_conflict=id`, {
+      method: 'POST', keepalive: true,
+      headers: { apikey: anon, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows),
+    });
+  } catch { /* yok say */ }
+}

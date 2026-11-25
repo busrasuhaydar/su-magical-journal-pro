@@ -476,7 +476,21 @@ export function usePages(projectId: string) {
   return useQuery({ queryKey: ['pages', projectId], queryFn: () => run<Page[]>(supabase.from('pages').select('*').eq('project_id', projectId).is('deleted_at', null).order('position')) });
 }
 export function useAllPages() {
-  return useQuery({ queryKey: ['pages', 'all'], queryFn: () => run<Page[]>(supabase.from('pages').select('id,project_id,title,icon,parent_id,position,updated_at,artwork_key').is('deleted_at', null)) });
+  return useQuery({ queryKey: ['pages', 'all'], queryFn: () => run<Page[]>(supabase.from('pages').select('id,project_id,title,icon,parent_id,position,updated_at,artwork_key,journal_day').is('deleted_at', null)) });
+}
+/** Günlük sayfası (Day.tsx): o güne ait pages kaydı. */
+export function useJournalPage(day: DayKey) {
+  return useQuery({ queryKey: ['pages', 'journal', day], queryFn: async () => (await run<Page[]>(supabase.from('pages').select('*').eq('journal_day', day).is('deleted_at', null).limit(1)))[0] ?? null });
+}
+export async function ensureJournalPage(day: DayKey, title: string): Promise<Page> {
+  return run<Page>(supabase.from('pages').upsert({ journal_day: day, title, icon: '📔', project_id: null, position: 0 }, { onConflict: 'owner_id,journal_day' }).select().single());
+}
+/** Sayfanın adresi: projede ise proje sekmesi, değilse /pages. */
+export function pageHref(pg: { id: string; project_id: string | null; journal_day?: string | null } | undefined, projects: Project[] | undefined) {
+  if (!pg) return '/pages';
+  if (pg.journal_day) return `/day/${pg.journal_day}`;
+  const p = pg.project_id ? projects?.find((x) => x.id === pg.project_id) : undefined;
+  return p ? `/projects/${p.slug}/pages/${pg.id}` : `/pages/${pg.id}`;
 }
 export function usePageBlocks(pageId: string | null) {
   return useQuery({ queryKey: ['blocks', pageId], enabled: !!pageId, queryFn: () => run<PageBlock[]>(supabase.from('page_blocks').select('*').eq('page_id', pageId!).order('position')) });
