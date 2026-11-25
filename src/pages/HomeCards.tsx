@@ -1,16 +1,19 @@
 // Ana sayfa özel kartları (sayfa, koleksiyon, etiket, görsel/eser, alıntı, sayaç, hızlı not) ve kayıtlı düzenler (ör. "Sabah", "Stüdyo").
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, FileText, Gem, Hash, Hourglass, ImageIcon, LayoutGrid, Plus, Quote, Save, StickyNote, Trash2, type LucideIcon } from 'lucide-react';
-import { useAllPages, usePageBlocks, useProfile } from '../lib/data';
+import { Check, FileText, Gem, Hash, Hourglass, ImageIcon, LayoutGrid, Plus, Quote, RotateCcw, Save, SkipForward, StickyNote, Trash2, type LucideIcon } from 'lucide-react';
+import { useAllPages, useCompleteTask, useJournal, useOpportunities, useOppDates, useOverdue, usePageBlocks, useProfile, useTasks } from '../lib/data';
+import { OPEN_STATUSES, PRIORITY_ORDER, type Task } from '../lib/types';
+import { getPref, setPref } from '../lib/prefs';
+import { useEditors } from '../components/Editors';
 import { useNfts } from '../lib/nft';
 import { useTagLinks, useTags, TAG_ENTITY_LABEL } from '../lib/tags';
 import { useArtworks } from '../lib/artworks';
 import { ArtImage } from '../components/ArtImage';
-import { Dialog, Field } from '../components/ui';
+import { Dialog, Field, useToast } from '../components/ui';
 import { usePrefsWriter } from '../lib/ui';
 import type { CustomCard, ScreenLayout, UseLayout } from '../lib/layout';
-import { todayKey, formatLong } from '../lib/dates';
+import { addDays, todayKey, formatLong } from '../lib/dates';
 
 export const CARD_TYPES: [CustomCard['type'], string, LucideIcon][] = [
   ['page', 'Page', FileText], ['collection', 'Collection view', Gem], ['tag', 'Tag list', Hash], ['image', 'Image / artwork', ImageIcon],
@@ -154,5 +157,53 @@ export function PresetBar({ editing }: { editing: boolean }) {
         </span>
       )}
     </div>
+  );
+}
+
+/** "Şimdi ne yapmalıyım?": tek öneri. Gecikmiş görev → 3 gün içindeki son başvuru → günün hedefi → en öncelikli açık görev. */
+export function NowCard({ title }: { title: string }) {
+  const today = todayKey();
+  const overdue = useOverdue();
+  const dates = useOppDates();
+  const opps = useOpportunities();
+  const tasks = useTasks();
+  const j = useJournal(today);
+  const complete = useCompleteTask();
+  const toast = useToast();
+  const { openTask } = useEditors();
+  const skipKey = `now-skip:${today}`;
+  const [skip, setSkip] = useState<string[]>(() => { try { return JSON.parse(getPref(skipKey, '[]')); } catch { return []; } });
+  const doSkip = (id: string) => { const n = [...skip, id]; setSkip(n); setPref(skipKey, JSON.stringify(n)); };
+  type S = { id: string; kind: string; title: string; sub: string; task?: Task; href?: string };
+  const cands: S[] = [];
+  (overdue.data ?? []).forEach((t) => cands.push({ id: t.id, kind: 'Overdue', title: t.title, sub: `Was due ${t.due_date ? formatLong(t.due_date) : 'earlier'}`, task: t }));
+  (dates.data ?? []).filter((d) => d.kind === 'deadline' && d.day >= today && d.day <= addDays(today, 3)).sort((a, b) => a.day.localeCompare(b.day)).forEach((d) => {
+    const o = opps.data?.find((x) => x.id === d.opportunity_id);
+    if (o && !['submitted', 'awaiting', 'accepted', 'rejected', 'exhibiting', 'completed', 'withdrawn'].includes(o.status)) cands.push({ id: d.id, kind: 'Deadline soon', title: o.title, sub: `Application deadline ${formatLong(d.day)}`, href: `/opportunities/${o.id}` });
+  });
+  if (j.data?.day?.goal) cands.push({ id: `goal-${today}`, kind: 'Today’s goal', title: j.data.day.goal, sub: 'Your goal for today', href: `/day/${today}` });
+  (tasks.data ?? []).filter((t) => OPEN_STATUSES.includes(t.status) && (!t.due_date || t.due_date >= today)).sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
+    .slice(0, 20).forEach((t) => cands.push({ id: t.id, kind: 'Top priority', title: t.title, sub: t.due_date ? `Due ${formatLong(t.due_date)}` : 'No date', task: t }));
+  const s = cands.find((c) => !skip.includes(c.id));
+  async function done() {
+    if (!s) return;
+    if (s.task) { try { await complete.mutateAsync({ id: s.task.id, done: true }); toast.ok('Done ✓'); } catch (x) { toast.fail(x); } }
+    else doSkip(s.id);
+  }
+  return (
+    <section className="glass panel now-next">
+      <div className="panel-head"><h2>{title}</h2>{skip.length > 0 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setSkip([]); setPref(skipKey, '[]'); }}><RotateCcw size={13} />Reset</button>}</div>
+      {!s ? <p className="small muted">Nothing urgent. Enjoy creating ✦</p> : (
+        <div className="nn-body">
+          <span className="nn-kind">{s.kind}</span>
+          {s.href ? <Link to={s.href} className="nn-title">{s.title}</Link> : <button type="button" className="nn-title" onClick={() => s.task && openTask(s.task)}>{s.title}</button>}
+          <span className="small muted">{s.sub}</span>
+          <div className="row" style={{ gap: 6 }}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={done}><Check size={14} />Done</button>
+            <button type="button" className="btn btn-glass btn-sm" onClick={() => doSkip(s.id)}><SkipForward size={14} />Skip</button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

@@ -1,9 +1,10 @@
 // Veri katmanı: tüm ekranlar aynı tabloları okur; değişiklikler Realtime ile her yere yansır.
+import { occurrences } from './rrule';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, sha256, slugify } from './supabase';
-import { addDays, addMonths, toInstant, todayKey, type DayKey } from './dates';
+import { addDays, toInstant, todayKey, type DayKey } from './dates';
 import type { CalEvent, CalendarEntry, FileRec, Holiday, JournalBlock, JournalDay, Profile, Project, ProjectProgress, Task } from './types';
 
 export const queryClient = new QueryClient({ defaultOptions: {
@@ -107,15 +108,7 @@ export interface CalData { tasks: Task[]; events: CalEvent[]; posts: import('./t
 /** Recurring görevin (ör. 15 günde bir) aralıktaki gelecek örnekleri. */
 function projectRepeats(t: Task, from: DayKey, to: DayKey): CalExtra[] {
   if (!t.rrule || !t.due_date) return [];
-  const freq = /FREQ=([A-Z]+)/.exec(t.rrule)?.[1], n = Number(/INTERVAL=(\d+)/.exec(t.rrule)?.[1] ?? 1);
-  const out: CalExtra[] = [];
-  let k = t.due_date;
-  for (let i = 0; i < 400; i++) {
-    k = freq === 'DAILY' ? addDays(k, n) : freq === 'WEEKLY' ? addDays(k, 7 * n) : freq === 'MONTHLY' ? addMonths(k, n) : addMonths(k, 12 * n);
-    if (k > to) break;
-    if (k >= from) out.push({ id: `rep-${t.id}-${k}`, day: k, label: `↻ ${t.title}`, kind: 'repeat' });
-  }
-  return out;
+  return occurrences(t.rrule, t.due_date, from, to).map((k) => ({ id: `rep-${t.id}-${k}`, day: k, label: `↻ ${t.title}`, kind: 'repeat' as const }));
 }
 export function useCalendarRange(from: DayKey, to: DayKey) {
   return useQuery({

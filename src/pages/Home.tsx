@@ -34,10 +34,10 @@ interface Item { id: string; at: number; end: number; title: string; sub: string
 
 import { QuickNote } from './Inbox';
 import { EditableItem, Sortable, useEditMode, useLayout, type Size } from '../lib/layout';
-import { AddCardDialog, CustomCardView, PresetBar, cardIcon, cardLabel } from './HomeCards';
+import { AddCardDialog, CustomCardView, NowCard, PresetBar, cardIcon, cardLabel } from './HomeCards';
 
 const HOME_CARDS: [string, string, Size][] = [
-  ['note', 'Quick Note', 'l'], ['plan', 'Today’s Plan', 'm'], ['todo', 'To-dos', 'm'], ['routines', 'Reminders', 's'], ['art', 'Artwork of the Day', 's'],
+  ['now', 'What should I do now?', 'm'], ['note', 'Quick Note', 'm'], ['plan', 'Today’s Plan', 'm'], ['todo', 'To-dos', 'm'], ['routines', 'Reminders', 's'], ['art', 'Artwork of the Day', 's'],
   ['ideas', 'On My Mind', 's'], ['week', 'This Week', 'l'], ['upcoming', 'Upcoming', 'm'], ['projects', 'My Projects', 'm'], ['social', 'Social Media', 's'], ['month', 'Month', 's'],
 ];
 
@@ -105,6 +105,7 @@ export default function Home() {
     ...custom.map((c) => ({ id: c.id, label: cardLabel(c), size: 'm' as const, icon: cardIcon(c) })),
   ], { fallbackHidden: hp.ui.hide });
   const cards: Record<string, React.ReactNode> = {
+    now: <NowCard title={lay.nameOf('now', 'What should I do now?')} />,
     note: <QuickNote />,
     plan: (
         <section className="glass panel">

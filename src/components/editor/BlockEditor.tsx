@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent as RCE, type KeyboardEvent as RKE, type ReactNode, type TouchEvent as RTE } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DndContext, KeyboardSensor, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragMoveEvent } from '@dnd-kit/core';
-import { CheckSquare, Code2, FileText, GripVertical, Heading1, Heading2, Heading3, ImagePlus, Link2, List, ListChecks, ListOrdered, ListTodo, Minus, Paperclip, Plus, Quote, Sparkle, Trash2, Type, X, Copy, Palette, Repeat2 } from 'lucide-react';
+import { CheckSquare, Code2, FileText, GripVertical, Heading1, Heading2, Heading3, ImagePlus, Link2, List, ListChecks, ListOrdered, ListTodo, Minus, Paperclip, Plus, Quote, Sparkle, Trash2, Type, X, Copy, Palette, Repeat2, CalendarClock } from 'lucide-react';
 import { addToGallery, uploadFile, useFiles, usePageBlocks, useProfile, useSignedUrl, useTasks } from '../../lib/data';
 import { keepaliveUpsert, supabase } from '../../lib/supabase';
 import type { BlockType, FileRec, Page, PageBlock } from '../../lib/types';
@@ -17,6 +17,8 @@ import { MediaSources, Thumb } from '../Media';
 import { useProjectGallery } from '../../pages/project/Gallery';
 import { HAS_MARKUP, PAGE_TOKEN, renderInline } from './inline';
 import { BG_COLORS, BlockTools, EmbedBlock, FormatBubble, PasteChoice, PlusMenu, TEXT_COLORS, splitLines, type Fmt, type Preset } from './blockParts';
+import { parseDateText, type ParsedDate } from '../../lib/dateParse';
+import { toInstant } from '../../lib/dates';
 import { EXTRA_BLOCKS, ExtraBlock, extraSlash } from './extraBlocks';
 
 export type PageLite = Pick<Page, 'id' | 'title' | 'icon' | 'parent_id' | 'project_id'> & { journal_day?: string | null };
@@ -77,6 +79,28 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
   const [drag, setDrag] = useState<string | null>(null);
   const [drop, setDrop] = useState<{ id: string; pos: DropPos } | null>(null);
   const mentionIds = useRef<Set<string> | null>(null);
+  const [dateSug, setDateSug] = useState<{ id: string; start: number; end: number; p: ParsedDate } | null>(null);
+  /** "@yarın 10:00" → tarih çipi + hatırlatmalı görev (reminders). */
+  async function acceptDate() {
+    const d = dateSug; setDateSug(null); if (!d) return;
+    const b = listRef.current.find((x) => x.id === d.id); if (!b) return;
+    const v = b.content.text ?? '';
+    const iso = d.p.time ? `${d.p.day} ${d.p.time}` : d.p.day;
+    const token = `{d:${iso}|${d.p.label}} `;
+    const text = v.slice(0, d.start) + token + v.slice(d.end);
+    change(b.id, { content: { ...b.content, text } }, true);
+    focusReq.current = { id: b.id, at: d.start + token.length };
+    const title = text.replace(/\{d:[^}]*\}/g, '').replace(/\[\[page:[^|\]]+\|([^\]]*)\]\]/g, '$1').replace(/[*_~=`]/g, '').trim().slice(0, 200) || 'Reminder';
+    try {
+      const at = toInstant(d.p.day, d.p.time ? Number(d.p.time.slice(0, 2)) * 60 + Number(d.p.time.slice(3)) : 9 * 60);
+      const ins = await supabase.from('tasks').insert({ title, due_date: d.p.day, project_id: projectId, ...(d.p.time ? { starts_at: at, ends_at: new Date(new Date(at).getTime() + 30 * 60000).toISOString() } : {}) }).select('id').single();
+      if (ins.error) throw ins.error;
+      const r = await supabase.from('reminders').insert({ task_id: ins.data.id, remind_at: at, label: 'From a page' });
+      if (r.error) throw r.error;
+      ['tasks', 'cal', 'reminders'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      toast.ok(`Reminder set · ${d.p.label}`);
+    } catch (x) { toast.fail(x); }
+  }
 
   const setList = useCallback((next: PageBlock[]) => { listRef.current = next; setListS(next); onText?.(next); }, [onText]);
 
@@ -273,7 +297,9 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
         if (re.test(text) && !re.test(b.content.text ?? '')) { change(b.id, { type, content: { ...b.content, ...extra, text: text.replace(re, '') } }); focusReq.current = { id: b.id, at: 0 }; return; }
       }
     }
-    onDateText?.(b, text, caret, (t) => change(b.id, { content: { ...b.content, text: t } }));
+    const dm = /(^|\s)@([^@\n]{2,32})$/.exec(text.slice(0, caret));
+    const pd = dm ? parseDateText(dm[2]) : null;
+    setDateSug(pd && dm ? { id: b.id, start: caret - dm[2].length - 1, end: caret, p: pd } : null);
     change(b.id, { content: { ...b.content, text } });
   }
 
@@ -338,6 +364,10 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
       if (e.key === 'ArrowUp') { e.preventDefault(); setMentionSel((x) => Math.max(x - 1, 0)); return; }
       if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); void pickMention(mentionItems[mentionSel] ?? 'new'); return; }
       if (e.key === 'Escape') { e.preventDefault(); setMention(null); return; }
+    }
+    if (dateSug && dateSug.id === b.id) {
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); void acceptDate(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setDateSug(null); return; }
     }
     if (slashItems.length && b.id === focused) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSel((x) => Math.min(x + 1, slashItems.length - 1)); return; }
@@ -525,6 +555,12 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
             <button type="button" role="option" aria-selected={mentionSel === mentionItems.length} className={mentionSel === mentionItems.length ? 'on' : ''} onMouseDown={(e) => { e.preventDefault(); void pickMention('new'); }}><Plus size={15} />New page{mention.q.trim() ? ` “${mention.q.trim()}”` : ''}</button>
           </div>
         )}
+        {dateSug?.id === b.id && (
+          <div className="block-menu" role="listbox" aria-label="Date">
+            <span className="bm-cap">Date & reminder</span>
+            <button type="button" role="option" aria-selected className="on" onMouseDown={(e) => { e.preventDefault(); void acceptDate(); }}><CalendarClock size={15} />{dateSug.p.label} · Enter</button>
+          </div>
+        )}
         {menu?.at === i && <PlusMenu menu={BLOCK_MENU} recent={recent} onPick={(t) => chooseInsert(t, i)} onPreset={(p) => preset(p, i)} onClose={() => setMenu(null)} />}
         {cur === b.id && !selecting && !slashItems.length && !mention && (
           <BlockTools menu={BLOCK_MENU} canText={isText(b.type)} a={{
@@ -576,9 +612,6 @@ export function BlockEditor({ pageId, projectId, pages, onOpenPage, onOps, onTex
   );
 }
 
-/** @tarih gibi metin içi tetikleyiciler için kanca (extraBlocks belirler). */
-let onDateText: ((b: PageBlock, text: string, caret: number, set: (t: string) => void) => void) | undefined;
-export function setDateTextHook(f: typeof onDateText) { onDateText = f; }
 
 function BlockRow({ b, dragging, drop, selecting, picked, onPick, gutter, del, children, onTouchStart, onTouchEnd }: {
   b: PageBlock; dragging: boolean; drop: DropPos | null; selecting: boolean; picked: boolean; onPick: () => void; gutter: ReactNode; del: ReactNode; children: ReactNode;
