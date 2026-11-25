@@ -7,6 +7,7 @@ import { formatRelative, dayKeyOf } from '../../lib/dates';
 import type { Page } from '../../lib/types';
 import { ConfirmButton, useToast } from '../ui';
 import { BlockEditor, type PageLite } from './BlockEditor';
+import { HistoryButton } from './History';
 
 export const PAGE_ICONS = ['📄', '💡', '🔍', '🎨', '🗒️', '🛠️', '🏁', '📸', '✨', '📚', '🌸', '🔮'];
 
@@ -38,6 +39,7 @@ export function PageView({ page, pages, projectId, onOpenPage, onCreateChild, ac
       <div className="row small muted" style={{ marginBottom: 10 }}>
         <span>Last edited: {formatRelative(dayKeyOf(page.updated_at))}</span>
         {actions}
+        <HistoryButton pageId={page.id} />
         <ConfirmButton label={<><Trash2 size={13} />Delete page</>} className="btn btn-ghost btn-sm" confirmText="Move the page and its subpages to trash?"
           onConfirm={async () => { const { error } = await supabase.from('pages').update({ deleted_at: new Date().toISOString() }).eq('id', page.id); if (error) toast.fail(error); else { qc.invalidateQueries({ queryKey: ['pages'] }); onOpenPage(page.parent_id); } }} />
       </div>

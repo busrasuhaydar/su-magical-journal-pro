@@ -1035,3 +1035,15 @@ html.zm .cb-turn-cast { display: none !important; }
 .off-badge .spin { animation: offspin 1s linear infinite; }
 @keyframes offspin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .off-badge .spin { animation: none; } }
+
+/* ═══ Sayfa geçmişi ═══ */
+.hist { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; min-height: 300px; }
+.hist-list { display: grid; align-content: start; gap: 4px; max-height: 60vh; overflow-y: auto; }
+.hist-v { display: flex; gap: 8px; align-items: flex-start; text-align: left; border: 1px solid transparent; background: rgba(255,255,255,.45); border-radius: 10px; padding: 8px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+.hist-v span { display: grid; } .hist-v small { color: var(--ink-500); }
+.hist-v.on { border-color: var(--rose-300); background: rgba(255,226,240,.85); }
+.hist-prev { max-height: 60vh; overflow-y: auto; padding: 12px 16px; border-radius: 14px; background: rgba(255,255,255,.55); border: 1px solid var(--glass-edge); }
+.hist-prev .hp-p, .hist-prev .hp-li { margin: 4px 0; white-space: pre-wrap; }
+.hist-prev .hp-h { font-family: var(--f-serif); margin: 10px 0 4px; }
+.trash-list { max-height: 420px; overflow-y: auto; }
+@media (max-width: 640px) { .hist { grid-template-columns: 1fr; } .hist-list { max-height: 180px; } }
